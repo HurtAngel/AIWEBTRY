@@ -840,8 +840,8 @@ def api_generate_media():
     data_url = None
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
-    try:
-      if media_type == "image":
+try:
+        if media_type == "image":
             dim_map = {"1:1": (1024, 1024), "16:9": (1280, 720), "9:16": (720, 1280)}
             w, h = dim_map.get(aspect_ratio, (1024, 1024))
             payload = {
@@ -853,11 +853,11 @@ def api_generate_media():
                 "safe_mode": False,
                 "hide_watermark": True
             }
-            
+
             r = requests.post(endpoint, headers=headers, json=payload, timeout=120)
             if r.status_code != 200:
                 return jsonify({"error": f"Venice API Hatası ({r.status_code}): {r.text[:300]}"}), 400
-                
+
             rj = r.json()
             if "data" in rj and len(rj["data"]) > 0:
                 if "b64_json" in rj["data"][0]:
