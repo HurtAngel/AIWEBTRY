@@ -824,6 +824,10 @@ def api_generate_media():
         tm = next((t for t in DB["trained_models"] if t["id"] == trained_id), None)
         if tm:
             final_prompt = f"{tm.get('trigger_word', '')}, {prompt} ({tm.get('training_data', '')[:100]})"
+            
+    # Kullanıcı negatif prompt yazdıysa bunu ana promptun sonuna komut olarak ekliyoruz
+    if negative_prompt:
+        final_prompt = f"{final_prompt} (avoid: {negative_prompt})"
 
     api_key = DB["settings"].get("venice_api_key") or os.getenv("VENICE_API_KEY", "")
     if not api_key:
@@ -842,7 +846,6 @@ def api_generate_media():
             payload = {
                 "model": model_obj["api_model_id"],
                 "prompt": final_prompt,
-                "negative_prompt": negative_prompt,
                 "size": size_map.get(aspect_ratio, "1024x1024"),
                 "response_format": "b64_json"
             }
@@ -867,7 +870,7 @@ def api_generate_media():
                 "model": model_obj["api_model_id"],
                 "prompt": final_prompt
             }
-            # Venice Video API için varsa ek parametreler buraya konabilir
+            # Sadece geçerli parametreler gönderiliyor
             r = requests.post(endpoint, headers=headers, json=payload, timeout=180)
             if r.status_code != 200:
                 return jsonify({"error": f"Venice API Hatası ({r.status_code}): {r.text[:300]}"}), 400
