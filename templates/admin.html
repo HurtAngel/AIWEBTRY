@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TANRI MODU // NEXUS ADMIN PANELİ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #06070b; color: #f8fafc; }
+        .glass { background: rgba(15, 18, 30, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- ÜST BAR -->
+    <header class="glass h-16 px-6 flex items-center justify-between sticky top-0 z-30">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-rose-600 flex items-center justify-center font-extrabold shadow-lg shadow-rose-600/30">⚡</div>
+            <div>
+                <h1 class="font-extrabold text-sm tracking-wide text-rose-400">NEXUS // TANRI MODU ADMİN PANELİ</h1>
+                <p class="text-[11px] text-slate-400">Tüm Sistem Değişkenleri, Modeller, Kotalar, RAM ve JSON Veritabanı</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div class="px-3.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold">
+                🧠 Sunucu RAM: <span id="ramBadge">0</span> / 512 MB
+            </div>
+            <a href="/" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold border border-white/10">← Siteye Dön</a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl w-full mx-auto p-6 space-y-8">
+
+        <!-- 1. BÖLÜM: JSON VERİTABANI YEDEKLEME & RAM YÖNETİCİSİ -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="glass rounded-3xl p-6 space-y-4">
+                <h2 class="font-bold text-base text-amber-300">💾 JSON Veritabanı Yedekleme</h2>
+                <p class="text-xs text-slate-400">İndirilen JSON yedeğinde tüm kullanıcılar, karakterler (PP dahil), sohbetler, modeller ve ayarlar yer alır. Üretilen görsel/videolar yedeği şişirmemek için hariç tutulur.</p>
+                <div class="space-y-2.5 pt-2">
+                    <a href="/api/admin/db/export" class="block w-full text-center py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs">⬇ JSON Veritabanını İndir (Download)</a>
+                    <label class="block w-full text-center py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-amber-500/40 text-amber-300 font-bold text-xs cursor-pointer">
+                        ⬆ JSON Yedeği Yükle (Upload)
+                        <input type="file" accept=".json" onchange="uploadDbJson(this)" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 glass rounded-3xl p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-bold text-base text-cyan-300">🧹 Canlı RAM & Geçici Medya Yöneticisi</h2>
+                        <p class="text-xs text-slate-400">RAM'deki sohbet metinlerini veya üretilmiş geçici görsel/videoları tek tek seçip silebilirsiniz.</p>
+                    </div>
+                    <button onclick="deleteRamItem('temp_media', 'ALL')" class="px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/40 text-rose-300 text-xs font-bold">Tüm Geçici Medyaları Sil</button>
+                </div>
+                <div id="ramItemsList" class="space-y-2 max-h-56 overflow-y-auto pr-1"></div>
+            </div>
+        </section>
+
+        <!-- 2. BÖLÜM: MODEL HAVUZU VE KREDİ MALİYETLERİ -->
+        <section class="glass rounded-3xl p-6 space-y-4">
+            <h2 class="font-bold text-base text-purple-300">🤖 AI Model Havuzu & Kredi Tüketim Oranları</h2>
+            <p class="text-xs text-slate-400">Sisteme istediğin kadar Venice AI veya OpenAI uyumlu Dil, Görsel ve Video modeli ekleyebilir, mesaj/üretim başı kredi maliyetini belirleyebilirsin.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-6 gap-2.5 bg-slate-900/90 p-3.5 rounded-2xl border border-white/5">
+                <input id="mName" type="text" placeholder="Görünür Model Adı" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                <input id="mApiId" type="text" placeholder="API Model ID (Örn: venice-uncensored)" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                <select id="mType" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                    <option value="chat">💬 Dil / RP Modeli</option>
+                    <option value="image">🎨 Görsel Modeli</option>
+                    <option value="video">🎬 Video Modeli</option>
+                </select>
+                <input id="mCost" type="number" placeholder="Kredi Maliyeti (Örn: 5)" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                <input id="mEndpoint" type="text" placeholder="Özel Endpoint (Opsiyonel)" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                <button onclick="saveModel()" class="bg-purple-600 hover:bg-purple-500 rounded-xl font-bold text-xs py-2">+ Modeli Ekle / Güncelle</button>
+            </div>
+
+            <div id="modelsTable" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+        </section>
+
+        <!-- 3. BÖLÜM: KULLANICI YÖNETİMİ, KREDİ VE ÖZEL KOTALAR -->
+        <section class="glass rounded-3xl p-6 space-y-4">
+            <h2 class="font-bold text-base text-emerald-300">👥 Kullanıcılar, Özel Hesap Yetkileri, Krediler ve Model Kısıtlamaları</h2>
+            <div class="grid grid-cols-2 md:grid-cols-7 gap-2.5 bg-slate-900/90 p-3.5 rounded-2xl border border-white/5">
+                <input id="uName" type="text" placeholder="Kullanıcı Adı" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                <input id="uPass" type="text" placeholder="Şifre" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                <select id="uRole" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                    <option value="user">Standart</option>
+                    <option value="vip">Özel Hesap (VIP)</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <input id="uCredits" type="number" placeholder="Kredi Bakiyesi" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                <input id="uCharLimit" type="number" placeholder="Karakter Limiti" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                <input id="uTrainLimit" type="number" placeholder="Model Eğitme Limiti" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                <input id="uModels" type="text" placeholder="İzinli Modeller (* veya ID)" class="bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+            </div>
+            <button onclick="saveUser()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-xs">💾 Kullanıcıyı Oluştur / Güncelle</button>
+
+            <div id="usersList" class="space-y-2"></div>
+        </section>
+
+        <!-- 4. BÖLÜM: "YUMUŞAK G'SİNE KADAR" DİNAMİK DEĞİŞKENLER -->
+        <section class="glass rounded-3xl p-6 space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                    <h2 class="font-bold text-base text-rose-300">⚙️ Dinamik Sistem Değişkenleri ("Yumuşak G'sine Kadar" Her Şey)</h2>
+                    <p class="text-xs text-slate-400">API Key (`venice_api_key`), hafıza özetleme sınırları, arayüz metinleri, uyarılar ve prompt şablonlarını buradan anlık değiştirebilir veya yeni değişken ekleyebilirsin.</p>
+                </div>
+                <button onclick="saveAllSettings()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-rose-600 to-purple-600 hover:from-rose-500 hover:to-purple-500 font-extrabold text-xs shadow-lg">💾 Tüm Değişkenleri Kaydet</button>
+            </div>
+
+            <!-- Yeni Değişken Ekleme -->
+            <div class="flex gap-2 bg-slate-900/90 p-3 rounded-2xl border border-white/5">
+                <input id="newSettingKey" type="text" placeholder="Yeni Değişken Anahtarı (Örn: ozel_duyuru_metni)" class="w-1/3 bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs font-mono">
+                <input id="newSettingVal" type="text" placeholder="Değeri" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs">
+                <button onclick="addNewSetting()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold">+ Değişken Ekle</button>
+            </div>
+
+            <div id="settingsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+        </section>
+
+    </main>
+
+    <script>
+        let ADMIN_DATA = null;
+
+        async function loadAdmin() {
+            const res = await fetch("/api/admin/state");
+            ADMIN_DATA = await res.json();
+            document.getElementById("ramBadge").innerText = ADMIN_DATA.ram_usage_mb;
+
+            renderRamItems();
+            renderModels();
+            renderUsers();
+            renderSettings();
+        }
+
+        function renderRamItems() {
+            const box = document.getElementById("ramItemsList");
+            if (!ADMIN_DATA.ram_items.length) {
+                box.innerHTML = `<p class="text-xs text-slate-500">RAM'de silinebilecek sohbet veya geçici medya bulunmuyor.</p>`;
+                return;
+            }
+            box.innerHTML = ADMIN_DATA.ram_items.map(item => `
+                <div class="flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-900/90 border border-white/5 text-xs">
+                    <div class="flex items-center gap-3 truncate">
+                        <span class="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 font-mono text-[10px]">${item.size_kb} KB</span>
+                        <span class="truncate">${item.label}</span>
+                    </div>
+                    <button onclick="deleteRamItem('${item.category}', '${item.id}')" class="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white font-bold ml-3">Sil</button>
+                </div>
+            `).join("");
+        }
+
+        async function deleteRamItem(category, id) {
+            await fetch("/api/admin/ram/delete", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({category, id})
+            });
+            loadAdmin();
+        }
+
+        function renderModels() {
+            const box = document.getElementById("modelsTable");
+            box.innerHTML = ADMIN_DATA.db.models.map(m => `
+                <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-white/5 space-y-1.5 text-xs">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-purple-300">${m.name}</span>
+                        <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">${m.cost} ⚡</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 font-mono">API ID: ${m.api_model_id} (${m.type})</p>
+                    <div class="flex justify-end gap-2 pt-1">
+                        <button onclick="fillModelForm('${m.id}')" class="text-cyan-400 hover:underline">Düzenle</button>
+                        <button onclick="deleteModel('${m.id}')" class="text-rose-400 hover:underline">Sil</button>
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        function fillModelForm(id) {
+            const m = ADMIN_DATA.db.models.find(x => x.id === id);
+            if (!m) return;
+            document.getElementById("mName").value = m.name;
+            document.getElementById("mApiId").value = m.api_model_id;
+            document.getElementById("mType").value = m.type;
+            document.getElementById("mCost").value = m.cost;
+            document.getElementById("mEndpoint").value = m.endpoint_override || "";
+            document.getElementById("mName").dataset.editId = m.id;
+        }
+
+        async function saveModel() {
+            const nameEl = document.getElementById("mName");
+            await fetch("/api/admin/models", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    id: nameEl.dataset.editId || undefined,
+                    name: nameEl.value,
+                    api_model_id: document.getElementById("mApiId").value,
+                    type: document.getElementById("mType").value,
+                    cost: document.getElementById("mCost").value || 1,
+                    endpoint_override: document.getElementById("mEndpoint").value,
+                    active: true
+                })
+            });
+            nameEl.dataset.editId = "";
+            nameEl.value = "";
+            loadAdmin();
+        }
+
+        async function deleteModel(id) {
+            await fetch(`/api/admin/models/${id}`, {method: "DELETE"});
+            loadAdmin();
+        }
+
+        function renderUsers() {
+            const box = document.getElementById("usersList");
+            box.innerHTML = Object.values(ADMIN_DATA.db.users).map(u => `
+                <div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-slate-900/90 border border-white/5 text-xs">
+                    <div class="flex items-center gap-3">
+                        <span class="font-bold text-emerald-300">${u.username}</span>
+                        <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300">Şifre: ${u.password}</span>
+                        <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">Rol: ${u.role}</span>
+                        <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">${u.credits} Kredi</span>
+                        <span class="text-slate-400">Karakter Kotası: ${u.char_limit} | Eğitim Kotası: ${u.train_limit} | Modeller: ${(u.allowed_models || ['*']).join(',')}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="fillUserForm('${u.username}')" class="text-cyan-400 hover:underline">Düzenle</button>
+                        ${u.username !== 'Admin' ? `<button onclick="deleteUser('${u.username}')" class="text-rose-400 hover:underline">Sil</button>` : ''}
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        function fillUserForm(uname) {
+            const u = ADMIN_DATA.db.users[uname];
+            if (!u) return;
+            document.getElementById("uName").value = u.username;
+            document.getElementById("uPass").value = u.password;
+            document.getElementById("uRole").value = u.role;
+            document.getElementById("uCredits").value = u.credits;
+            document.getElementById("uCharLimit").value = u.char_limit;
+            document.getElementById("uTrainLimit").value = u.train_limit;
+            document.getElementById("uModels").value = (u.allowed_models || ["*"]).join(",");
+        }
+
+        async function saveUser() {
+            await fetch("/api/admin/users", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    username: document.getElementById("uName").value,
+                    password: document.getElementById("uPass").value,
+                    role: document.getElementById("uRole").value,
+                    credits: document.getElementById("uCredits").value || 100,
+                    char_limit: document.getElementById("uCharLimit").value || 3,
+                    train_limit: document.getElementById("uTrainLimit").value || 1,
+                    allowed_models: document.getElementById("uModels").value || "*"
+                })
+            });
+            loadAdmin();
+        }
+
+        async function deleteUser(uname) {
+            await fetch(`/api/admin/users/${uname}`, {method: "DELETE"});
+            loadAdmin();
+        }
+
+        function renderSettings() {
+            const grid = document.getElementById("settingsGrid");
+            grid.innerHTML = Object.entries(ADMIN_DATA.db.settings).map(([k, v]) => `
+                <div class="p-3 rounded-2xl bg-slate-900/90 border border-white/5 space-y-1">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[11px] font-mono font-bold text-rose-300">${k}</label>
+                        <button onclick="deleteSetting('${k}')" class="text-[10px] text-slate-500 hover:text-rose-400">Sil</button>
+                    </div>
+                    <textarea data-setting-key="${k}" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:border-rose-500 focus:outline-none">${v}</textarea>
+                </div>
+            `).join("");
+        }
+
+        async function saveAllSettings() {
+            const inputs = document.querySelectorAll("[data-setting-key]");
+            const settings = {};
+            inputs.forEach(el => {
+                settings[el.dataset.settingKey] = el.value;
+            });
+            await fetch("/api/admin/settings", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({settings})
+            });
+            alert("Tüm dinamik değişkenler RAM ve db.json üzerine kaydedildi!");
+            loadAdmin();
+        }
+
+        async function addNewSetting() {
+            const k = document.getElementById("newSettingKey").value.trim();
+            const v = document.getElementById("newSettingVal").value;
+            if (!k) return;
+            await fetch("/api/admin/settings", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({settings: {[k]: v}})
+            });
+            document.getElementById("newSettingKey").value = "";
+            document.getElementById("newSettingVal").value = "";
+            loadAdmin();
+        }
+
+        async function deleteSetting(k) {
+            await fetch(`/api/admin/settings/${k}`, {method: "DELETE"});
+            loadAdmin();
+        }
+
+        async function uploadDbJson(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const formData = new FormData();
+            formData.append("file", file);
+            const res = await fetch("/api/admin/db/import", {method: "POST", body: formData});
+            const data = await res.json();
+            if (data.error) return alert(data.error);
+            alert("JSON Veritabanı başarıyla RAM'e yüklendi!");
+            loadAdmin();
+        }
+
+        loadAdmin();
+    </script>
+</body>
+</html>
