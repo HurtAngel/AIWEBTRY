@@ -403,7 +403,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
         break
 
     # 2. AŞAMA: Yedek olarak OpenAI uyumlu endpoint (/images/generations) dene
-fallback_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
+    fallback_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
     compat_payload = {
         "model": model_api_id,
         "prompt": fallback_prompt,
