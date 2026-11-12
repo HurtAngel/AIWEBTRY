@@ -797,7 +797,7 @@ def api_assistant_send():
 @app.route("/api/media/generate", methods=["POST"])
 @login_required
 def api_generate_media():
-user = get_current_user()
+    user = get_current_user()
     data = request.json or {}
     media_type = data.get("type", "image")  # "image" or "video"
     prompt = (data.get("prompt") or "").strip()
