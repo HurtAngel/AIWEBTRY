@@ -403,7 +403,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
         break
 
     # 2. AŞAMA: Yedek olarak OpenAI uyumlu endpoint (/images/generations) dene
-    fallback_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
+fallback_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
     compat_payload = {
         "model": model_api_id,
         "prompt": fallback_prompt,
@@ -412,7 +412,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     }
     r2 = requests.post(compat_endpoint if "venice.ai" in endpoint else endpoint, headers=headers, json=compat_payload, timeout=120)
     if r2.status_code == 200:
-rj2 = r2.json()
+        rj2 = r2.json()
         data_url = extract_image_from_response(rj2)
         if data_url:
             return data_url, None
