@@ -31,8 +31,8 @@ def get_default_db():
             "welcome_message": "Nexus AI Stüdyosuna hoş geldin! Karakterini seç veya yeni bir dünya yarat.",
             "api_base_url": "https://api.venice.ai/api/v1",
             "chat_endpoint": "https://api.venice.ai/api/v1/chat/completions",
-            "image_endpoint": "https://api.venice.ai/api/v1/images/generations",
-            "video_endpoint": "https://api.venice.ai/api/v1/video/generations",
+            "image_endpoint": "https://api.venice.ai/api/v1/image/generate",
+            "video_endpoint": "https://api.venice.ai/api/v1/video/queue",
             "venice_api_key": os.getenv("VENICE_API_KEY", ""),
             "default_register_credits": "100",
             "default_char_limit": "3",
@@ -153,6 +153,9 @@ def load_db():
                     for sk, sv in default["settings"].items():
                         if sk not in loaded["settings"]:
                             loaded["settings"][sk] = sv
+                    # Eski OpenAI uyumlu görsel adresi kalmışsa otomatik olarak sansürsüz yerel adrese yükselt
+                    if loaded["settings"].get("image_endpoint") == "https://api.venice.ai/api/v1/images/generations":
+                        loaded["settings"]["image_endpoint"] = "https://api.venice.ai/api/v1/image/generate"
                     if "Admin" not in loaded["users"]:
                         loaded["users"]["Admin"] = default["users"]["Admin"]
                     else:
@@ -217,6 +220,13 @@ def check_and_deduct_credit(user, model_obj):
     user["credits"] = int(user.get("credits", 0)) - cost
     save_db()
     return True, None
+
+def refund_credit(user, model_obj):
+    if user["role"] == "admin":
+        return
+    cost = int(model_obj.get("cost", 1))
+    user["credits"] = int(user.get("credits", 0)) + cost
+    save_db()
 
 def get_ram_usage_mb():
     try:
@@ -296,6 +306,218 @@ def compress_chat_memory_if_needed(chat, force=False):
     except Exception as e:
         print(f"Hafıza sıkıştırma hatası: {e}")
         return False
+
+# --- AKILLI GÖRSEL & VİDEO API YARDIMCILARI ---
+
+def extract_image_from_response(rj):
+    if isinstance(rj, dict):
+        if "images" in rj and len(rj["images"]) > 0:
+            img_item = rj["images"][0]
+            if isinstance(img_item, str):
+                if img_item.startswith("http") or img_item.startswith("data:"):
+                    return img_item
+                return "data:image/png;base64," + img_item
+            elif isinstance(img_item, dict):
+                if "b64_json" in img_item:
+                    return "data:image/png;base64," + img_item["b64_json"]
+                if "url" in img_item:
+                    return img_item["url"]
+        if "data" in rj and len(rj["data"]) > 0:
+            d0 = rj["data"][0]
+            if isinstance(d0, dict):
+                if "b64_json" in d0:
+                    return "data:image/png;base64," + d0["b64_json"]
+                if "url" in d0:
+                    return d0["url"]
+            elif isinstance(d0, str):
+                return "data:image/png;base64," + d0
+        if "image" in rj and isinstance(rj["image"], str):
+            return "data:image/png;base64," + rj["image"]
+        if "url" in rj and isinstance(rj["url"], str):
+            return rj["url"]
+    return None
+
+def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio):
+    dim_map = {"1:1": (1024, 1024), "16:9": (1280, 720), "9:16": (720, 1280)}
+    size_map = {"1:1": "1024x1024", "16:9": "1280x720", "9:16": "720x1280"}
+    w, h = dim_map.get(aspect_ratio, (1024, 1024))
+
+    # Kullanıcının ayarladığı endpoint "/images/generations" ise bile önce Venice yerel "/image/generate" deniyoruz (blurlamayı kapatmak için)
+    native_endpoint = "https://api.venice.ai/api/v1/image/generate"
+    compat_endpoint = "https://api.venice.ai/api/v1/images/generations"
+    target_endpoint = native_endpoint if "venice.ai" in endpoint else endpoint
+
+    # 1. AŞAMA: Yeni nesil Venice şeması (aspect_ratio + safe_mode: False)
+    payload = {
+        "model": model_api_id,
+        "prompt": final_prompt,
+        "aspect_ratio": aspect_ratio,
+        "safe_mode": False,
+        "hide_watermark": True
+    }
+    if negative_prompt:
+        payload["negative_prompt"] = negative_prompt
+
+    for attempt in range(4):
+        r = requests.post(target_endpoint, headers=headers, json=payload, timeout=120)
+        if r.status_code == 200:
+            rj = r.json()
+            data_url = extract_image_from_response(rj)
+            if data_url:
+                return data_url, None
+            return None, f"Beklenmeyen Görsel API yanıtı: {str(rj)[:200]}"
+
+        err_text = r.text
+        err_lower = err_text.lower()
+
+        # Model aspect_ratio yerine width/height istiyorsa otomatik dönüştür
+        if ("aspect_ratio" in err_lower or "width" in err_lower or "height" in err_lower) and "aspect_ratio" in payload:
+            payload.pop("aspect_ratio", None)
+            payload["width"] = w
+            payload["height"] = h
+            continue
+
+        # Model width/height yerine aspect_ratio istiyorsa otomatik dönüştür
+        if ("width" in err_lower or "height" in err_lower) and "width" in payload:
+            payload.pop("width", None)
+            payload.pop("height", None)
+            payload["aspect_ratio"] = aspect_ratio
+            continue
+
+        # Tanınmayan anahtar hatası (unrecognized_keys) varsa o anahtarları otomatik silip tekrar dene
+        try:
+            err_json = r.json()
+            removed_any = False
+            for issue in err_json.get("issues", []):
+                for bad_key in issue.get("keys", []):
+                    if bad_key in payload:
+                        payload.pop(bad_key, None)
+                        removed_any = True
+            if removed_any:
+                if "negative_prompt" not in payload and negative_prompt and "(avoid:" not in payload.get("prompt", ""):
+                    payload["prompt"] = f"{final_prompt} (avoid: {negative_prompt})"
+                continue
+        except Exception:
+            pass
+
+        break
+
+    # 2. AŞAMA: Yedek olarak OpenAI uyumlu endpoint (/images/generations) dene
+    fallback_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
+    compat_payload = {
+        "model": model_api_id,
+        "prompt": fallback_prompt,
+        "size": size_map.get(aspect_ratio, "1024x1024"),
+        "response_format": "b64_json"
+    }
+    r2 = requests.post(compat_endpoint if "venice.ai" in endpoint else endpoint, headers=headers, json=compat_payload, timeout=120)
+    if r2.status_code == 200:
+        rj2 = r2.json()
+        data_url = extract_image_from_response(rj2)
+        if data_url:
+            return data_url, None
+
+    return None, f"Venice Görsel API Hatası ({r.status_code}): {r.text[:300]}"
+
+def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio):
+    video_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
+    ar_clean = aspect_ratio if aspect_ratio in ["16:9", "9:16", "1:1"] else "16:9"
+
+    # Venice Video API hem /video/queue hem /video/generations destekleyebilir
+    queue_url = "https://api.venice.ai/api/v1/video/queue"
+    retrieve_url = "https://api.venice.ai/api/v1/video/retrieve"
+
+     candidate_endpoints = [endpoint]
+    if "venice.ai" in endpoint:
+        if queue_url not in candidate_endpoints:
+            candidate_endpoints.insert(0, queue_url)
+        gen_url = "https://api.venice.ai/api/v1/video/generations"
+        if gen_url not in candidate_endpoints:
+            candidate_endpoints.append(gen_url)
+
+    last_error = ""
+
+    for ep in candidate_endpoints:
+        payload = {
+            "model": model_api_id,
+            "prompt": video_prompt,
+            "duration": "5s",
+            "aspect_ratio": ar_clean
+        }
+        if negative_prompt:
+            payload["negative_prompt"] = negative_prompt
+
+        for attempt in range(3):
+            r = requests.post(ep, headers=headers, json=payload, timeout=180)
+
+            # Doğrudan MP4 binary döndüyse
+            ctype = r.headers.get("Content-Type", "")
+            if r.status_code == 200 and ("video/" in ctype or "application/octet-stream" in ctype):
+                b64_vid = base64.b64encode(r.content).decode("utf-8")
+                return f"data:video/mp4;base64,{b64_vid}", None
+
+            if r.status_code == 200:
+                rj = r.json()
+                # Kuyruk (queue_id) döndüyse video hazır olana kadar bekle (polling)
+                if "queue_id" in rj:
+                    qid = rj["queue_id"]
+                    for _ in range(45):
+                        time.sleep(3)
+                        poll_r = requests.post(retrieve_url, headers=headers, json={"model": model_api_id, "queue_id": qid}, timeout=60)
+                        poll_ctype = poll_r.headers.get("Content-Type", "")
+                        if poll_r.status_code == 200 and ("video/" in poll_ctype or "application/octet-stream" in poll_ctype):
+                            b64_vid = base64.b64encode(poll_r.content).decode("utf-8")
+                            return f"data:video/mp4;base64,{b64_vid}", None
+                        if poll_r.status_code == 200:
+                            prj = poll_r.json()
+                            status = str(prj.get("status", "")).upper()
+                            if status in ["COMPLETED", "SUCCEEDED", "DONE"]:
+                                if "url" in prj:
+                                    return prj["url"], None
+                                if "video_url" in prj:
+                                    return prj["video_url"], None
+                                if "data" in prj and len(prj["data"]) > 0:
+                                    d0 = prj["data"][0]
+                                    if "url" in d0:
+                                        return d0["url"], None
+                                    if "b64_json" in d0:
+                                        return "data:video/mp4;base64," + d0["b64_json"]
+                            elif status in ["FAILED", "ERROR"]:
+                                return None, f"Video üretimi başarısız oldu: {prj}"
+                    return None, "Video üretim süresi zaman aşımına uğradı (Venice kuyruğu yoğun)."
+
+                # Doğrudan JSON içinde URL veya base64 döndüyse
+                if "data" in rj and len(rj["data"]) > 0:
+                    d0 = rj["data"][0]
+                    if isinstance(d0, dict):
+                        if "url" in d0:
+                            return d0["url"], None
+                        if "b64_json" in d0:
+                            return "data:video/mp4;base64," + d0["b64_json"]
+                if "url" in rj:
+                    return rj["url"], None
+                if "video" in rj:
+                    return ("data:video/mp4;base64," + rj["video"]) if not rj["video"].startswith("http") else rj["video"], None
+
+            last_error = f"Venice Video API Hatası ({r.status_code}): {r.text[:300]}"
+
+            # Tanınmayan anahtarları (unrecognized_keys) otomatik temizleyip tekrar dene
+            try:
+                err_json = r.json()
+                removed = False
+                for issue in err_json.get("issues", []):
+                    for bad_key in issue.get("keys", []):
+                        if bad_key in payload:
+                            payload.pop(bad_key, None)
+                            removed = True
+                if removed:
+                    continue
+            except Exception:
+                pass
+
+            break
+
+    return None, last_error or "Video üretilemedi."
 
 # --- SAYFA ROTALARI ---
 
@@ -599,6 +821,7 @@ def api_send_rp_message(chat_id):
 
     char = next((c for c in DB["characters"] if c["id"] == chat["character_id"]), None)
     if not char:
+        refund_credit(user, model_obj)
         return jsonify({"error": "Karakter silinmiş."}), 404
 
     user_msg = {
@@ -621,6 +844,7 @@ def api_send_rp_message(chat_id):
         )
     except Exception as e:
         chat["messages"].pop()
+        refund_credit(user, model_obj)
         return jsonify({"error": str(e)}), 500
 
     ai_msg = {
@@ -673,6 +897,7 @@ def api_regenerate_rp_message(chat_id):
         prompt_msgs = build_rp_prompt_messages(user, char, temp_chat_copy)
         ai_reply = call_llm_api(prompt_msgs, model_obj["api_model_id"], model_obj.get("endpoint_override", ""))
     except Exception as e:
+        refund_credit(user, model_obj)
         return jsonify({"error": str(e)}), 500
 
     if "swipes" not in last_msg:
@@ -784,6 +1009,7 @@ def api_assistant_send():
         reply = call_llm_api(prompt_msgs, model_obj["api_model_id"], model_obj.get("endpoint_override", ""))
     except Exception as e:
         achat["messages"].pop()
+        refund_credit(user, model_obj)
         return jsonify({"error": str(e)}), 500
 
     achat["messages"].append({"role": "assistant", "content": reply, "timestamp": datetime.now().strftime("%H:%M")})
@@ -827,70 +1053,34 @@ def api_generate_media():
 
     api_key = DB["settings"].get("venice_api_key") or os.getenv("VENICE_API_KEY", "")
     if not api_key:
+        refund_credit(user, model_obj)
         return jsonify({"error": "API Anahtarı (venice_api_key) bulunamadı! Lütfen Admin panelinden ekleyin."}), 400
 
     endpoint = model_obj.get("endpoint_override") or (
-        DB["settings"].get("image_endpoint") if media_type == "image" else DB["settings"].get("video_endpoint")
+        DB["settings"].get("image_endpoint", "https://api.venice.ai/api/v1/image/generate")
+        if media_type == "image"
+        else DB["settings"].get("video_endpoint", "https://api.venice.ai/api/v1/video/queue")
     )
 
-    data_url = None
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
     try:
         if media_type == "image":
-            dim_map = {"1:1": (1024, 1024), "16:9": (1280, 720), "9:16": (720, 1280)}
-            w, h = dim_map.get(aspect_ratio, (1024, 1024))
-            payload = {
-                "model": model_obj["api_model_id"],
-                "prompt": final_prompt,
-                "negative_prompt": negative_prompt,
-                "width": w,
-                "height": h,
-                "safe_mode": False,
-                "hide_watermark": True
-            }
+            data_url, api_err = smart_generate_image(
+                endpoint, headers, model_obj["api_model_id"], final_prompt, negative_prompt, aspect_ratio
+            )
+        else:
+            data_url, api_err = smart_generate_video(
+                endpoint, headers, model_obj["api_model_id"], final_prompt, negative_prompt, aspect_ratio
+            )
 
-            r = requests.post(endpoint, headers=headers, json=payload, timeout=120)
-            if r.status_code != 200:
-                return jsonify({"error": f"Venice API Hatası ({r.status_code}): {r.text[:300]}"}), 400
-
-            rj = r.json()
-            if "data" in rj and len(rj["data"]) > 0:
-                if "b64_json" in rj["data"][0]:
-                    data_url = "data:image/png;base64," + rj["data"][0]["b64_json"]
-                elif "url" in rj["data"][0]:
-                    data_url = rj["data"][0]["url"]
-            elif "images" in rj and len(rj["images"]) > 0:
-                data_url = "data:image/png;base64," + rj["images"][0]
-            else:
-                return jsonify({"error": f"Beklenmeyen API yanıtı: {str(rj)[:200]}"}), 500
-
-        elif media_type == "video":
-            video_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
-            payload = {
-                "model": model_obj["api_model_id"],
-                "prompt": video_prompt
-            }
-            r = requests.post(endpoint, headers=headers, json=payload, timeout=180)
-            if r.status_code != 200:
-                return jsonify({"error": f"Venice API Hatası ({r.status_code}): {r.text[:300]}"}), 400
-
-            rj = r.json()
-            if "data" in rj and len(rj["data"]) > 0:
-                if "url" in rj["data"][0]:
-                    data_url = rj["data"][0]["url"]
-                elif "b64_json" in rj["data"][0]:
-                    data_url = "data:video/mp4;base64," + rj["data"][0]["b64_json"]
-            elif "url" in rj:
-                data_url = rj["url"]
-            else:
-                return jsonify({"error": f"Beklenmeyen API yanıtı: {str(rj)[:200]}"}), 500
+        if api_err or not data_url:
+            refund_credit(user, model_obj)
+            return jsonify({"error": api_err or "Medya verisi API'den çekilemedi."}), 400
 
     except requests.exceptions.RequestException as e:
+        refund_credit(user, model_obj)
         return jsonify({"error": f"API Bağlantı Hatası: {str(e)}"}), 500
-
-    if not data_url:
-        return jsonify({"error": "Görsel veya Video verisi API'den çekilemedi."}), 500
 
     media_id = "med_" + uuid.uuid4().hex[:8]
     size_kb = round(len(data_url.encode("utf-8")) / 1024.0, 2)
