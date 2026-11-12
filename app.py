@@ -825,7 +825,7 @@ def api_generate_media():
         if tm:
             final_prompt = f"{tm.get('trigger_word', '')}, {prompt} ({tm.get('training_data', '')[:100]})"
             
-    # Kullanıcı negatif prompt yazdıysa bunu ana promptun sonuna komut olarak ekliyoruz
+# Kullanıcı negatif prompt yazdıysa bunu ana promptun sonuna komut olarak ekliyoruz
     if negative_prompt:
         final_prompt = f"{final_prompt} (avoid: {negative_prompt})"
 
@@ -841,13 +841,17 @@ def api_generate_media():
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
     try:
-        if media_type == "image":
-            size_map = {"1:1": "1024x1024", "16:9": "1280x720", "9:16": "720x1280"}
+      if media_type == "image":
+            dim_map = {"1:1": (1024, 1024), "16:9": (1280, 720), "9:16": (720, 1280)}
+            w, h = dim_map.get(aspect_ratio, (1024, 1024))
             payload = {
                 "model": model_obj["api_model_id"],
                 "prompt": final_prompt,
-                "size": size_map.get(aspect_ratio, "1024x1024"),
-                "response_format": "b64_json"
+                "negative_prompt": negative_prompt,
+                "width": w,
+                "height": h,
+                "safe_mode": False,
+                "hide_watermark": True
             }
             
             r = requests.post(endpoint, headers=headers, json=payload, timeout=120)
