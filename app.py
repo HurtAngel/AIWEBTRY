@@ -417,7 +417,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
         if data_url:
             return data_url, None
 
-    return None, f"Venice Görsel API Hatası ({r.status_code}): {r.text[:300]}"
+ return None, f"Venice Görsel API Hatası ({r.status_code}): {r.text[:300]}"
 
 def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio):
     video_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
@@ -427,7 +427,7 @@ def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative
     queue_url = "https://api.venice.ai/api/v1/video/queue"
     retrieve_url = "https://api.venice.ai/api/v1/video/retrieve"
 
-     candidate_endpoints = [endpoint]
+    candidate_endpoints = [endpoint]
     if "venice.ai" in endpoint:
         if queue_url not in candidate_endpoints:
             candidate_endpoints.insert(0, queue_url)
@@ -449,7 +449,6 @@ def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative
 
         for attempt in range(3):
             r = requests.post(ep, headers=headers, json=payload, timeout=180)
-
             # Doğrudan MP4 binary döndüyse
             ctype = r.headers.get("Content-Type", "")
             if r.status_code == 200 and ("video/" in ctype or "application/octet-stream" in ctype):
