@@ -797,7 +797,7 @@ def api_assistant_send():
 @app.route("/api/media/generate", methods=["POST"])
 @login_required
 def api_generate_media():
-    user = get_current_user()
+user = get_current_user()
     data = request.json or {}
     media_type = data.get("type", "image")  # "image" or "video"
     prompt = (data.get("prompt") or "").strip()
@@ -824,10 +824,6 @@ def api_generate_media():
         tm = next((t for t in DB["trained_models"] if t["id"] == trained_id), None)
         if tm:
             final_prompt = f"{tm.get('trigger_word', '')}, {prompt} ({tm.get('training_data', '')[:100]})"
-            
-# Kullanıcı negatif prompt yazdıysa bunu ana promptun sonuna komut olarak ekliyoruz
-    if negative_prompt:
-        final_prompt = f"{final_prompt} (avoid: {negative_prompt})"
 
     api_key = DB["settings"].get("venice_api_key") or os.getenv("VENICE_API_KEY", "")
     if not api_key:
@@ -840,7 +836,7 @@ def api_generate_media():
     data_url = None
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
-try:
+    try:
         if media_type == "image":
             dim_map = {"1:1": (1024, 1024), "16:9": (1280, 720), "9:16": (720, 1280)}
             w, h = dim_map.get(aspect_ratio, (1024, 1024))
@@ -870,15 +866,15 @@ try:
                 return jsonify({"error": f"Beklenmeyen API yanıtı: {str(rj)[:200]}"}), 500
 
         elif media_type == "video":
+            video_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
             payload = {
                 "model": model_obj["api_model_id"],
-                "prompt": final_prompt
+                "prompt": video_prompt
             }
-            # Sadece geçerli parametreler gönderiliyor
             r = requests.post(endpoint, headers=headers, json=payload, timeout=180)
             if r.status_code != 200:
                 return jsonify({"error": f"Venice API Hatası ({r.status_code}): {r.text[:300]}"}), 400
-                
+
             rj = r.json()
             if "data" in rj and len(rj["data"]) > 0:
                 if "url" in rj["data"][0]:
