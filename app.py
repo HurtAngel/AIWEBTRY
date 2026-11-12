@@ -21,7 +21,6 @@ DB_FILE = "db.json"
 db_lock = threading.Lock()
 
 # Üretilen görsel ve videolar JSON yedeğini şişirmemek için bu ayrı RAM havuzunda tutulur.
-# Yapı: { media_id: { "id", "user", "type": "image"|"video", "prompt", "model", "data_url", "created_at", "size_kb" } }
 TEMP_MEDIA = {}
 
 def get_default_db():
@@ -50,7 +49,7 @@ def get_default_db():
             "summarizer_prompt": "Aşağıdaki rol yapma sohbet geçmişini ve mevcut özeti oku. Önemli olayları, karakter ilişkilerini, verilen sözleri, mekan değişimlerini ve kritik detayları hiçbir önemli veriyi kaçırmadan maddeler halinde Türkçe olarak özetle. Gereksiz selamlaşmaları atla.",
             "default_temperature": "0.85",
             "default_max_tokens": "600",
-            "demo_fallback_when_no_key": "true",
+            "demo_fallback_when_no_key": "false",
             "ui_btn_send": "Gönder",
             "ui_btn_generate_img": "Görsel Üret",
             "ui_btn_generate_vid": "Video Üret"
@@ -242,7 +241,7 @@ def call_llm_api(messages, model_api_id, endpoint_override="", temperature=None,
     mtok = int(max_tokens if max_tokens is not None else DB["settings"].get("default_max_tokens", 600))
 
     if not api_key:
-        if DB["settings"].get("demo_fallback_when_no_key", "true") == "true":
+        if DB["settings"].get("demo_fallback_when_no_key", "false") == "true":
             last_user_msg = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "Merhaba")
             return f"*[Demo Modu - Venice API Key henüz girilmediği için simülasyon yanıtı üretildi]*\n\n*Bakışlarını sana çevirir ve derin bir nefes alır.* \"{last_user_msg[:80]}... Demek öyle? Admin panelinden `venice_api_key` değişkenine gerçek API anahtarını girdiğinde doğrudan **{model_api_id}** modeliyle konuşmaya başlayacağız.\""
         raise Exception("API Anahtarı (venice_api_key) tanımlanmamış! Admin panelinden API anahtarınızı girin.")
@@ -264,10 +263,6 @@ def call_llm_api(messages, model_api_id, endpoint_override="", temperature=None,
     return data["choices"][0]["message"]["content"]
 
 def compress_chat_memory_if_needed(chat, force=False):
-    """
-    Sohbet mesaj sayısı sınırı aştığında son X mesajı korur,
-    eski mesajları Özetleyici Model ile özetleyip siler.
-    """
     trigger_count = int(DB["settings"].get("memory_trigger_count", 10))
     keep_recent = int(DB["settings"].get("memory_keep_recent", 4))
     msgs = chat.get("messages", [])
@@ -486,7 +481,7 @@ def api_train_model():
         "id": "trn_" + uuid.uuid4().hex[:8],
         "creator": uname,
         "name": name,
-        "type": data.get("type", "memory_pack"),  # memory_pack, image_lora, video_lora
+        "type": data.get("type", "memory_pack"),
         "trigger_word": (data.get("trigger_word") or "").strip(),
         "training_data": (data.get("training_data") or "").strip(),
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -831,15 +826,18 @@ def api_generate_media():
             final_prompt = f"{tm.get('trigger_word', '')}, {prompt} ({tm.get('training_data', '')[:100]})"
 
     api_key = DB["settings"].get("venice_api_key") or os.getenv("VENICE_API_KEY", "")
+    if not api_key:
+        return jsonify({"error": "API Anahtarı (venice_api_key) bulunamadı! Lütfen Admin panelinden ekleyin."}), 400
+
     endpoint = model_obj.get("endpoint_override") or (
         DB["settings"].get("image_endpoint") if media_type == "image" else DB["settings"].get("video_endpoint")
     )
 
     data_url = None
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
-    if api_key and media_type == "image":
-        try:
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    try:
+        if media_type == "image":
             size_map = {"1:1": "1024x1024", "16:9": "1280x720", "9:16": "720x1280"}
             payload = {
                 "model": model_obj["api_model_id"],
@@ -848,41 +846,48 @@ def api_generate_media():
                 "size": size_map.get(aspect_ratio, "1024x1024"),
                 "response_format": "b64_json"
             }
-            r = requests.post(endpoint, headers=headers, json=payload, timeout=90)
-            if r.status_code == 200:
-                rj = r.json()
-                if "data" in rj and len(rj["data"]) > 0:
-                    if "b64_json" in rj["data"][0]:
-                        data_url = "data:image/png;base64," + rj["data"][0]["b64_json"]
-                    elif "url" in rj["data"][0]:
-                        data_url = rj["data"][0]["url"]
-                elif "images" in rj and len(rj["images"]) > 0:
-                    data_url = "data:image/png;base64," + rj["images"][0]
-        except Exception as e:
-            print(f"Görsel API çağrısı bilgi: {e}")
+            
+            r = requests.post(endpoint, headers=headers, json=payload, timeout=120)
+            if r.status_code != 200:
+                return jsonify({"error": f"Venice API Hatası ({r.status_code}): {r.text[:300]}"}), 400
+                
+            rj = r.json()
+            if "data" in rj and len(rj["data"]) > 0:
+                if "b64_json" in rj["data"][0]:
+                    data_url = "data:image/png;base64," + rj["data"][0]["b64_json"]
+                elif "url" in rj["data"][0]:
+                    data_url = rj["data"][0]["url"]
+            elif "images" in rj and len(rj["images"]) > 0:
+                data_url = "data:image/png;base64," + rj["images"][0]
+            else:
+                return jsonify({"error": f"Beklenmeyen API yanıtı: {str(rj)[:200]}"}), 500
 
-    # Demo / SVG veya Örnek Video Üretimi (API Key yoksa veya özel video endpoint test ediliyorsa)
+        elif media_type == "video":
+            payload = {
+                "model": model_obj["api_model_id"],
+                "prompt": final_prompt
+            }
+            # Venice Video API için varsa ek parametreler buraya konabilir
+            r = requests.post(endpoint, headers=headers, json=payload, timeout=180)
+            if r.status_code != 200:
+                return jsonify({"error": f"Venice API Hatası ({r.status_code}): {r.text[:300]}"}), 400
+                
+            rj = r.json()
+            if "data" in rj and len(rj["data"]) > 0:
+                if "url" in rj["data"][0]:
+                    data_url = rj["data"][0]["url"]
+                elif "b64_json" in rj["data"][0]:
+                    data_url = "data:video/mp4;base64," + rj["data"][0]["b64_json"]
+            elif "url" in rj:
+                data_url = rj["url"]
+            else:
+                return jsonify({"error": f"Beklenmeyen API yanıtı: {str(rj)[:200]}"}), 500
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"API Bağlantı Hatası: {str(e)}"}), 500
+
     if not data_url:
-        if media_type == "image":
-            svg_content = f'''<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
-                <defs>
-                    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#0f172a"/>
-                        <stop offset="50%" stop-color="#311042"/>
-                        <stop offset="100%" stop-color="#090d16"/>
-                    </linearGradient>
-                </defs>
-                <rect width="800" height="800" fill="url(#bg)"/>
-                <circle cx="400" cy="340" r="180" fill="none" stroke="#a855f7" stroke-width="3" opacity="0.4"/>
-                <circle cx="400" cy="340" r="120" fill="#a855f7" opacity="0.15"/>
-                <text x="400" y="320" fill="#f8fafc" font-family="sans-serif" font-size="26" font-weight="bold" text-anchor="middle">NEXUS AI STUDIO RENDER</text>
-                <text x="400" y="365" fill="#c084fc" font-family="sans-serif" font-size="18" text-anchor="middle">Model: {model_obj["name"]} ({aspect_ratio})</text>
-                <text x="400" y="440" fill="#94a3b8" font-family="sans-serif" font-size="15" text-anchor="middle">{final_prompt[:65]}</text>
-            </svg>'''
-            b64_svg = base64.b64encode(svg_content.encode("utf-8")).decode("utf-8")
-            data_url = f"data:image/svg+xml;base64,{b64_svg}"
-        else:
-            data_url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+        return jsonify({"error": "Görsel veya Video verisi API'den çekilemedi."}), 500
 
     media_id = "med_" + uuid.uuid4().hex[:8]
     size_kb = round(len(data_url.encode("utf-8")) / 1024.0, 2)
@@ -1091,7 +1096,6 @@ def api_admin_ram_delete():
 @app.route("/api/admin/db/export", methods=["GET"])
 @admin_required
 def api_admin_export_db():
-    # TEMP_MEDIA (üretilen görseller ve videolar) hariç, sadece DB (karakter PP'leri dahil) indirilir.
     json_bytes = json.dumps(DB, ensure_ascii=False, indent=2).encode("utf-8")
     stamp = datetime.now().strftime("%Y%m%d_%H%M")
     return send_file(
