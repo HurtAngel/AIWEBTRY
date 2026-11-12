@@ -412,12 +412,12 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     }
     r2 = requests.post(compat_endpoint if "venice.ai" in endpoint else endpoint, headers=headers, json=compat_payload, timeout=120)
     if r2.status_code == 200:
-        rj2 = r2.json()
+rj2 = r2.json()
         data_url = extract_image_from_response(rj2)
         if data_url:
             return data_url, None
 
- return None, f"Venice Görsel API Hatası ({r.status_code}): {r.text[:300]}"
+    return None, f"Venice Görsel API Hatası ({r.status_code}): {r.text[:300]}"
 
 def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio):
     video_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
