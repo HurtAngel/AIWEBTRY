@@ -98,6 +98,15 @@ def get_default_db():
                 "active": True
             },
             {
+                "id": "mdl_qwen_edit",
+                "name": "Qwen Image Edit (img2img)",
+                "api_model_id": "qwen-image-2-1-turbo-edit",
+                "type": "image",
+                "cost": 15,
+                "endpoint_override": "https://api.venice.ai/api/v1/image/edit-image",
+                "active": True
+            },
+            {
                 "id": "mdl_wan_video",
                 "name": "Venice Wan-2.1 Motion Video",
                 "api_model_id": "wan-2.1",
@@ -170,6 +179,19 @@ def ensure_db_compatibility(loaded):
                 c["reference_image"] = c.get("avatar", "")
     if "dms" not in loaded or not isinstance(loaded["dms"], dict):
         loaded["dms"] = {}
+    
+    # Yeni model eksikse varsayılanlara ekle
+    existing_model_ids = [m["api_model_id"] for m in loaded.get("models", [])]
+    if "qwen-image-2-1-turbo-edit" not in existing_model_ids:
+        loaded.setdefault("models", []).append({
+            "id": "mdl_qwen_edit",
+            "name": "Qwen Image Edit (img2img)",
+            "api_model_id": "qwen-image-2-1-turbo-edit",
+            "type": "image",
+            "cost": 15,
+            "endpoint_override": "https://api.venice.ai/api/v1/image/edit-image",
+            "active": True
+        })
     return loaded
 
 def load_db():
@@ -419,143 +441,64 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     w, h = dim_map.get(aspect_ratio, (1024, 1024))
 
     raw_b64, full_data_url = resolve_source_media_to_b64(source_media)
-    
     is_img2img = bool(raw_b64)
-    if is_img2img and "venice.ai" in endpoint:
-        target_endpoint = "https://api.venice.ai/api/v1/image/edit"
-    else:
-        target_endpoint = "https://api.venice.ai/api/v1/image/generate" if "venice.ai" in endpoint else endpoint
 
-    # 🌟 ÖNEMLİ: Eğer görsel dosyası (multipart/form-data) göndereceksek "application/json" header'ını silmeliyiz!
-    # Requests kütüphanesi 'files' argümanını gördüğünde multipart header'ını boundary ile kendi ekler.
-    req_headers = dict(headers)
-    if is_img2img and "Content-Type" in req_headers:
-        del req_headers["Content-Type"]
+    # IMG2IMG (Gerçek Dosya Yüklemesi Zod Uyumlu)
+    if is_img2img:
+        target_endpoint = "https://api.venice.ai/api/v1/image/edit-image" if "venice.ai" in endpoint else endpoint
+        edit_model = "qwen-image-2-1-turbo-edit" if model_api_id == "fluently-xl" else model_api_id
+        
+        req_headers = dict(headers)
+        if "Content-Type" in req_headers:
+            del req_headers["Content-Type"] # requests kütüphanesi files varken kendi ekler
 
-    payload = {
-        "model": model_api_id,
-        "prompt": final_prompt,
-        "safe_mode": "False", # Multipart form'da bool yerine string gitmesi daha garantidir
-        "hide_watermark": "True"
-    }
-    
-    if not is_img2img:
-        payload["aspect_ratio"] = aspect_ratio
-        payload["safe_mode"] = False
-        payload["hide_watermark"] = True
-    else:
-        payload["strength"] = str(strength or 0.65)
+        # Sadece 3 zorunlu parametre
+        payload = {
+            "model": edit_model,
+            "prompt": final_prompt
+        }
+        files_dict = {"image": ("source.png", base64.b64decode(raw_b64), "image/png")}
 
-    if negative_prompt:
-        payload["negative_prompt"] = negative_prompt
-
-    # API uyumsuzluklarında deneme yapmak için current_mode tanımlayalım
-    current_mode = "multipart" if is_img2img else "json"
-
-    for attempt in range(6):
-        if current_mode == "multipart":
-            # 1. Aşama: Gerçek dosya yüklemesi olarak (multipart/form-data) gönder
-            files_dict = {"image": ("source.png", base64.b64decode(raw_b64), "image/png")}
-            r = requests.post(target_endpoint, headers=req_headers, data=payload, files=files_dict, timeout=120)
-        else:
-            # 2. Aşama: JSON gövdesi olarak (application/json) gönder (Eğer API multipart desteklemiyorsa fallback)
-            json_payload = dict(payload)
-            for k, v in json_payload.items():
-                if v == "False": json_payload[k] = False
-                if v == "True": json_payload[k] = True
-                if k == "strength": json_payload[k] = float(v)
-            r = requests.post(target_endpoint, headers=headers, json=json_payload, timeout=120)
-
+        r = requests.post(target_endpoint, headers=req_headers, data=payload, files=files_dict, timeout=120)
+        
         if r.status_code == 200:
             rj = r.json()
             data_url = extract_image_from_response(rj)
-            if data_url:
-                return data_url, None
-            return None, f"Beklenmeyen Görsel API yanıtı: {str(rj)[:200]}"
+            if data_url: return data_url, None
+            return None, f"Beklenmeyen API yanıtı (Edit): {str(rj)[:200]}"
+        return None, f"Venice Görsel API Hatası ({r.status_code}): {r.text[:300]}"
 
-        err_text = r.text
-        err_lower = err_text.lower()
+    # TXT2IMG (Standart JSON Yüklemesi)
+    else:
+        target_endpoint = "https://api.venice.ai/api/v1/image/generate" if "venice.ai" in endpoint else endpoint
+        payload = {
+            "model": model_api_id,
+            "prompt": final_prompt,
+            "aspect_ratio": aspect_ratio,
+            "safe_mode": False,
+            "hide_watermark": True
+        }
+        if negative_prompt:
+            payload["negative_prompt"] = negative_prompt
 
-        # --- ADAPTİF HATA ÇÖZÜCÜ ---
+        r = requests.post(target_endpoint, headers=headers, json=payload, timeout=120)
+        if r.status_code == 200:
+            rj = r.json()
+            data_url = extract_image_from_response(rj)
+            if data_url: return data_url, None
+            return None, f"Beklenmeyen Görsel API yanıtı (Generate): {str(rj)[:200]}"
         
-        # Eğer multipart gönderdik ama endpoint desteklemiyorsa veya 'image' alanı JSON Base64 string bekliyorsa:
-        if current_mode == "multipart":
-            if r.status_code == 404 or "invalid endpoint" in err_lower:
-                target_endpoint = "https://api.venice.ai/api/v1/image/generate" if "venice.ai" in endpoint else endpoint
-                continue
-            if "json" in err_lower or "unsupported media type" in err_lower or "multipart" in err_lower:
-                current_mode = "json"
-                payload["image"] = raw_b64
-                continue
-
-        # Eğer JSON modundayken uç nokta image değil init_image ya da image_url istiyorsa:
-        if current_mode == "json":
-            if "init_image" in err_lower and "image" in payload:
-                payload.pop("image", None)
-                payload["init_image"] = full_data_url
-                continue
-            elif ("image_url" in err_lower or "invalid_union" in err_lower) and ("image" in payload or "init_image" in payload):
-                payload.pop("image", None)
-                payload.pop("init_image", None)
-                payload["image_url"] = full_data_url
-                continue
-
-        # Eğer API 'aspect_ratio' oranını veya en/boy değerlerini bekliyor/reddediyorsa düzelt:
-        if ("aspect_ratio" in err_lower or "width" in err_lower or "height" in err_lower) and "aspect_ratio" in payload:
+        err_lower = r.text.lower()
+        if "aspect_ratio" in err_lower:
             payload.pop("aspect_ratio", None)
             payload["width"] = w
             payload["height"] = h
-            continue
-
-        if ("width" in err_lower or "height" in err_lower) and "width" in payload:
-            payload.pop("width", None)
-            payload.pop("height", None)
-            payload["aspect_ratio"] = aspect_ratio
-            continue
-
-        # Eğer hala anlamsız parametre itirazı gelirse, issue keys içindekileri dinamik olarak sil ve tekrar dene
-        try:
-            err_json = r.json()
-            removed_any = False
-            for issue in err_json.get("issues", []):
-                for bad_key in issue.get("keys", []):
-                    if bad_key in payload:
-                        payload.pop(bad_key, None)
-                        removed_any = True
-            if removed_any:
-                if "negative_prompt" not in payload and negative_prompt and "(avoid:" not in payload.get("prompt", ""):
-                    payload["prompt"] = f"{final_prompt} (avoid: {negative_prompt})"
-                continue
-        except Exception:
-            pass
-            
-        break # Çözülemezse döngüyü kır, alttaki fallback/compat denemesine geç
-
-    # --- ESKİ / COMPATIBILITY (OpenAI formatı) FALLBACK ---
-    fallback_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
-    compat_endpoint = "https://api.venice.ai/api/v1/images/generations" if "venice.ai" in endpoint else endpoint
-    compat_payload = {
-        "model": model_api_id,
-        "prompt": fallback_prompt,
-        "size": size_map.get(aspect_ratio, "1024x1024"),
-        "response_format": "b64_json",
-        "moderation": "low"  
-    }
-    if raw_b64:
-        compat_payload["image"] = raw_b64
-
-    r2 = requests.post(compat_endpoint, headers=headers, json=compat_payload, timeout=120)
-    if r2.status_code != 200 and "image" in compat_payload:
-        compat_payload.pop("image", None)
-        r2 = requests.post(compat_endpoint, headers=headers, json=compat_payload, timeout=120)
-
-    if r2.status_code == 200:
-        rj2 = r2.json()
-        data_url = extract_image_from_response(rj2)
-        if data_url:
-            return data_url, None
-
-    return None, f"Venice Görsel API Hatası ({r.status_code}): {r.text[:300]}"
+            r2 = requests.post(target_endpoint, headers=headers, json=payload, timeout=120)
+            if r2.status_code == 200:
+                data_url = extract_image_from_response(r2.json())
+                if data_url: return data_url, None
+        
+        return None, f"Venice Görsel API Hatası ({r.status_code}): {r.text[:300]}"
 
 def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio, resolution="720p", source_media=None, strength=0.65):
     video_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
@@ -585,8 +528,6 @@ def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative
         }
         if negative_prompt:
             payload["negative_prompt"] = negative_prompt
-        
-        # Venice Video API'si, resim ucundan farklı olarak kaynağı genelde url üzerinden (data URI veya http) string olarak alır
         if full_data_url:
             if "video" in full_data_url[:30]:
                 payload["video_url"] = full_data_url
@@ -1460,7 +1401,9 @@ def api_generate_media():
         return jsonify({"error": "API Anahtarı bulunamadı!"}), 400
 
     endpoint = model_obj.get("endpoint_override") or (DB["settings"].get("image_endpoint") if media_type == "image" else DB["settings"].get("video_endpoint"))
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {api_key}"}
+    if media_type != "image":
+        headers["Content-Type"] = "application/json"
 
     try:
         if media_type == "image":
