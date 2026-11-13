@@ -114,6 +114,7 @@ def get_default_db():
                 "name": "Seraphina Vale",
                 "title": "Gece Loncası Suikastçısı",
                 "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+                "reference_image": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
                 "personality": "Soğukkanlı, alaycı, zeki ama güvendiği kişilere karşı gizlice korumacı. Hançer kullanmakta usta.",
                 "scenario": "Yağmurlu bir gecede Neo-Veridia şehrinin karanlık bir hanında karşılaşırsınız. Seraphina masada tek başına oturmuş hançerini temizlemektedir.",
                 "first_message": "*Yağmur damlaları hanın buğulu camlarına vururken, Seraphina kapının açılmasıyla bakışlarını elindeki gümüş hançerden kaldırır. Zümrüt yeşili gözleri seni tepeden tırnağa süzer ve dudaklarında hafif, tehlikeli bir tebessüm belirir.* \"Beni bulmak için yanlış gecede, yanlış mahalledesin yabancı. Söyle bakalım, seni buraya getiren cesaret mi yoksa aptallık mı?\"",
@@ -137,10 +138,40 @@ def get_default_db():
         "chats": {},
         "assistant_chats": {},
         "media": {},
-        "global_chat": []
+        "global_chat": [],
+        "dms": {}
     }
 
 DB = get_default_db()
+
+def ensure_db_compatibility(loaded):
+    """Eski JSON yedekleri yüklendiğinde eksik alanları bozmadan tamamlar."""
+    default = get_default_db()
+    for k, v in default.items():
+        if k not in loaded:
+            loaded[k] = v
+    if "settings" not in loaded or not isinstance(loaded["settings"], dict):
+        loaded["settings"] = default["settings"]
+    else:
+        for sk, sv in default["settings"].items():
+            if sk not in loaded["settings"]:
+                loaded["settings"][sk] = sv
+    if loaded["settings"].get("image_endpoint") == "https://api.venice.ai/api/v1/images/generations":
+        loaded["settings"]["image_endpoint"] = "https://api.venice.ai/api/v1/image/generate"
+    if "users" not in loaded or not isinstance(loaded["users"], dict):
+        loaded["users"] = default["users"]
+    if "Admin" not in loaded["users"]:
+        loaded["users"]["Admin"] = default["users"]["Admin"]
+    else:
+        loaded["users"]["Admin"]["password"] = "1234"
+        loaded["users"]["Admin"]["role"] = "admin"
+    if "characters" in loaded and isinstance(loaded["characters"], list):
+        for c in loaded["characters"]:
+            if "reference_image" not in c or not c["reference_image"]:
+                c["reference_image"] = c.get("avatar", "")
+    if "dms" not in loaded or not isinstance(loaded["dms"], dict):
+        loaded["dms"] = {}
+    return loaded
 
 def load_db():
     global DB
@@ -149,21 +180,7 @@ def load_db():
             try:
                 with open(DB_FILE, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
-                    default = get_default_db()
-                    for k, v in default.items():
-                        if k not in loaded:
-                            loaded[k] = v
-                    for sk, sv in default["settings"].items():
-                        if sk not in loaded["settings"]:
-                            loaded["settings"][sk] = sv
-                    if loaded["settings"].get("image_endpoint") == "https://api.venice.ai/api/v1/images/generations":
-                        loaded["settings"]["image_endpoint"] = "https://api.venice.ai/api/v1/image/generate"
-                    if "Admin" not in loaded["users"]:
-                        loaded["users"]["Admin"] = default["users"]["Admin"]
-                    else:
-                        loaded["users"]["Admin"]["password"] = "1234"
-                        loaded["users"]["Admin"]["role"] = "admin"
-                    DB = loaded
+                    DB = ensure_db_compatibility(loaded)
             except Exception as e:
                 print(f"DB yükleme hatası, varsayılan RAM DB kullanılıyor: {e}")
         else:
@@ -252,6 +269,14 @@ def save_media_file_helper(data_url, media_type):
         raw_bytes = base64.b64decode(b64_data)
         if "webp" in header: ext = "webp"
         elif "jpeg" in header or "jpg" in header: ext = "jpg"
+        elif "mp4" in header or "video" in header: ext = "mp4"
+    elif data_url.startswith("/static/media/"):
+        local_path = os.path.join(MEDIA_DIR, os.path.basename(data_url))
+        with open(local_path, "rb") as lf:
+            raw_bytes = lf.read()
+        if local_path.endswith(".mp4"): ext = "mp4"
+        elif local_path.endswith(".jpg") or local_path.endswith(".jpeg"): ext = "jpg"
+        elif local_path.endswith(".webp"): ext = "webp"
     else:
         r = requests.get(data_url, timeout=60)
         raw_bytes = r.content
@@ -268,6 +293,33 @@ def save_media_file_helper(data_url, media_type):
     size_kb = round(len(raw_bytes) / 1024.0, 2)
     public_url = f"/static/media/{filename}"
     return media_id, public_url, size_kb
+
+def resolve_source_media_to_b64(source_media):
+    """Yüklenen data URL, yerel /static/media yolu veya harici URL'yi saf base64 ve data_url formatına çevirir."""
+    if not source_media:
+        return None, None
+    try:
+        if source_media.startswith("data:"):
+            header, b64_data = source_media.split(",", 1)
+            return b64_data.strip(), source_media
+        if source_media.startswith("/static/media/"):
+            fname = os.path.basename(source_media)
+            fpath = os.path.join(MEDIA_DIR, fname)
+            if os.path.exists(fpath):
+                with open(fpath, "rb") as f:
+                    raw = f.read()
+                b64 = base64.b64encode(raw).decode("utf-8")
+                mime = "video/mp4" if fname.endswith(".mp4") else "image/png"
+                return b64, f"data:{mime};base64,{b64}"
+        if source_media.startswith("http"):
+            r = requests.get(source_media, timeout=30)
+            if r.status_code == 200:
+                b64 = base64.b64encode(r.content).decode("utf-8")
+                ctype = r.headers.get("Content-Type", "image/png")
+                return b64, f"data:{ctype};base64,{b64}"
+    except Exception as e:
+        print(f"Kaynak medya çözümleme hatası: {e}")
+    return None, None
 
 # --- VENICE AI & LLM İSTEMCİSİ ---
 
@@ -334,7 +386,7 @@ def compress_chat_memory_if_needed(chat, force=False):
         print(f"Hafıza sıkıştırma hatası: {e}")
         return False
 
-# --- AKILLI GÖRSEL & VİDEO API YARDIMCILARI ---
+# --- AKILLI GÖRSEL & VİDEO API YARDIMCILARI (IMG2IMG, IMG2VID, VID2VID DESTEKLİ) ---
 
 def extract_image_from_response(rj):
     if isinstance(rj, dict):
@@ -364,7 +416,7 @@ def extract_image_from_response(rj):
             return rj["url"]
     return None
 
-def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio):
+def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio, source_media=None, strength=0.65):
     dim_map = {"1:1": (1024, 1024), "16:9": (1280, 720), "9:16": (720, 1280)}
     size_map = {"1:1": "1024x1024", "16:9": "1280x720", "9:16": "720x1280"}
     w, h = dim_map.get(aspect_ratio, (1024, 1024))
@@ -372,6 +424,8 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     native_endpoint = "https://api.venice.ai/api/v1/image/generate"
     compat_endpoint = "https://api.venice.ai/api/v1/images/generations"
     target_endpoint = native_endpoint if "venice.ai" in endpoint else endpoint
+
+    raw_b64, full_data_url = resolve_source_media_to_b64(source_media)
 
     payload = {
         "model": model_api_id,
@@ -383,7 +437,11 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     if negative_prompt:
         payload["negative_prompt"] = negative_prompt
 
-    for attempt in range(4):
+    if raw_b64:
+        payload["image"] = raw_b64
+        payload["strength"] = float(strength or 0.65)
+
+    for attempt in range(5):
         r = requests.post(target_endpoint, headers=headers, json=payload, timeout=120)
         if r.status_code == 200:
             rj = r.json()
@@ -394,6 +452,17 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
 
         err_text = r.text
         err_lower = err_text.lower()
+
+        # Eğer API 'image' yerine 'init_image' veya 'image_url' bekliyorsa otomatik dönüştür
+        if raw_b64 and ("image" in err_lower or "init_image" in err_lower):
+            if "image" in payload:
+                payload.pop("image", None)
+                payload["init_image"] = full_data_url
+                continue
+            elif "init_image" in payload:
+                payload.pop("init_image", None)
+                payload.pop("strength", None)
+                continue
 
         if ("aspect_ratio" in err_lower or "width" in err_lower or "height" in err_lower) and "aspect_ratio" in payload:
             payload.pop("aspect_ratio", None)
@@ -434,7 +503,14 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
         "response_format": "b64_json",
         "moderation": "low"  
     }
+    if raw_b64:
+        compat_payload["image"] = raw_b64
+
     r2 = requests.post(compat_endpoint if "venice.ai" in endpoint else endpoint, headers=headers, json=compat_payload, timeout=120)
+    if r2.status_code != 200 and "image" in compat_payload:
+        compat_payload.pop("image", None)
+        r2 = requests.post(compat_endpoint if "venice.ai" in endpoint else endpoint, headers=headers, json=compat_payload, timeout=120)
+
     if r2.status_code == 200:
         rj2 = r2.json()
         data_url = extract_image_from_response(rj2)
@@ -443,7 +519,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
 
     return None, f"Venice Görsel API Hatası ({r.status_code}): {r.text[:300]}"
 
-def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio, resolution="720p"):
+def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio, resolution="720p", source_media=None, strength=0.65):
     video_prompt = f"{final_prompt} (avoid: {negative_prompt})" if negative_prompt else final_prompt
     ar_clean = aspect_ratio if aspect_ratio in ["16:9", "9:16", "1:1"] else "16:9"
 
@@ -458,6 +534,7 @@ def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative
         if gen_url not in candidate_endpoints:
             candidate_endpoints.append(gen_url)
 
+    raw_b64, full_data_url = resolve_source_media_to_b64(source_media)
     last_error = ""
 
     for ep in candidate_endpoints:
@@ -470,8 +547,14 @@ def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative
         }
         if negative_prompt:
             payload["negative_prompt"] = negative_prompt
+        if full_data_url:
+            if "video" in full_data_url[:30]:
+                payload["video_url"] = full_data_url
+            else:
+                payload["image_url"] = full_data_url
+            payload["strength"] = float(strength or 0.65)
 
-        for attempt in range(4):
+        for attempt in range(5):
             r = requests.post(ep, headers=headers, json=payload, timeout=180)
             ctype = r.headers.get("Content-Type", "")
             
@@ -535,6 +618,12 @@ def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative
             except Exception:
                 pass
 
+            if any(k in payload for k in ["image_url", "video_url", "strength"]):
+                payload.pop("image_url", None)
+                payload.pop("video_url", None)
+                payload.pop("strength", None)
+                continue
+
             break
 
     return None, last_error or "Video üretilemedi."
@@ -581,10 +670,20 @@ def api_init():
         for m in DB.get("media", {}).values()
         if m.get("user") == uname or user["role"] == "admin"
     ]
+    user_directory = [
+        {
+            "username": u["username"],
+            "persona_name": u.get("persona_name", u["username"]),
+            "role": u.get("role", "user")
+        }
+        for u in DB["users"].values()
+        if not u.get("banned", False)
+    ]
 
     return jsonify({
         "authenticated": True,
         "user": {k: v for k, v in user.items() if k != "password"},
+        "users_directory": user_directory,
         "settings": public_settings,
         "models": active_models,
         "characters": visible_chars,
@@ -673,12 +772,24 @@ def api_create_character():
     if not name:
         return jsonify({"error": "Karakter adı zorunludur."}), 400
 
+    avatar_val = data.get("avatar") or "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80"
+    ref_val = data.get("reference_image") or avatar_val
+
+    # Eğer referans görsel data:image ise diske kaydet ki JSON şişmesin ve img2img hızlı çalışsın
+    if isinstance(ref_val, str) and ref_val.startswith("data:"):
+        try:
+            _, pub_url, _ = save_media_file_helper(ref_val, "image")
+            ref_val = pub_url
+        except Exception:
+            pass
+
     new_char = {
         "id": "char_" + uuid.uuid4().hex[:8],
         "creator": uname,
         "name": name,
         "title": (data.get("title") or "Özel Karakter").strip(),
-        "avatar": data.get("avatar") or "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80",
+        "avatar": avatar_val,
+        "reference_image": ref_val,
         "personality": (data.get("personality") or "").strip(),
         "scenario": (data.get("scenario") or "").strip(),
         "first_message": (data.get("first_message") or f"*Sana gülümseyerek bakar.* \"Merhaba, ben {name}.\"").strip(),
@@ -888,6 +999,94 @@ def api_send_rp_message(chat_id):
         "memory_compressed": compressed
     })
 
+@app.route("/api/rp/chats/<chat_id>/scene-image", methods=["POST"])
+@login_required
+def api_rp_generate_scene_image(chat_id):
+    """RP sohbeti içinde karakterin referans görselini kullanarak img2img sahne üretir."""
+    user = get_current_user()
+    chat = DB["chats"].get(chat_id)
+    if not chat or chat["user"] != user["username"]:
+        return jsonify({"error": "Sohbet bulunamadı."}), 404
+
+    char = next((c for c in DB["characters"] if c["id"] == chat["character_id"]), None)
+    if not char:
+        return jsonify({"error": "Karakter bulunamadı."}), 404
+
+    data = request.json or {}
+    scene_prompt = (data.get("prompt") or "").strip()
+    strength = float(data.get("strength") or 0.60)
+    aspect_ratio = data.get("aspect_ratio", "1:1")
+    img_model_id = data.get("model_id")
+
+    if not scene_prompt:
+        # Otomatik olarak son mesajdan sahne çıkar
+        last_m = chat["messages"][-1]["content"] if chat.get("messages") else char.get("scenario", "")
+        scene_prompt = f"{char['name']}, {char.get('personality', '')[:60]}, scene: {last_m[:180]}"
+    else:
+        scene_prompt = f"{char['name']}, {scene_prompt}"
+
+    model_obj = next((m for m in DB["models"] if m["id"] == img_model_id and m["type"] == "image"), None) or next((m for m in DB["models"] if m["type"] == "image" and m.get("active", True)), None)
+    if not model_obj:
+        return jsonify({"error": "Aktif görsel üretim modeli bulunamadı."}), 400
+
+    ok, err = check_and_deduct_credit(user, model_obj)
+    if not ok:
+        return jsonify({"error": err}), 403
+
+    api_key = DB["settings"].get("venice_api_key") or os.getenv("VENICE_API_KEY", "")
+    if not api_key:
+        refund_credit(user, model_obj)
+        return jsonify({"error": "API Anahtarı (venice_api_key) tanımlanmamış!"}), 400
+
+    ref_img = char.get("reference_image") or char.get("avatar")
+    endpoint = model_obj.get("endpoint_override") or DB["settings"].get("image_endpoint", "https://api.venice.ai/api/v1/image/generate")
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+    try:
+        data_url, api_err = smart_generate_image(endpoint, headers, model_obj["api_model_id"], scene_prompt, "deformed, blurry, bad anatomy", aspect_ratio, source_media=ref_img, strength=strength)
+        if api_err or not data_url:
+            refund_credit(user, model_obj)
+            return jsonify({"error": api_err or "Sahne görseli üretilemedi."}), 400
+        media_id, public_url, size_kb = save_media_file_helper(data_url, "image")
+    except Exception as e:
+        refund_credit(user, model_obj)
+        return jsonify({"error": str(e)}), 500
+
+    media_item = {
+        "id": media_id,
+        "user": user["username"],
+        "type": "image",
+        "mode": "rp_img2img",
+        "prompt": scene_prompt,
+        "model": model_obj["name"],
+        "aspect_ratio": aspect_ratio,
+        "file_path": public_url,
+        "size_kb": size_kb,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    DB.setdefault("media", {})[media_id] = media_item
+
+    scene_msg = {
+        "id": "msg_" + uuid.uuid4().hex[:8],
+        "role": "assistant",
+        "content": f"*📸 Sahne Görseli ({scene_prompt[:70]})*",
+        "media_url": public_url,
+        "media_id": media_id,
+        "swipes": [f"*📸 Sahne Görseli ({scene_prompt[:70]})*"],
+        "active_swipe": 0,
+        "timestamp": datetime.now().strftime("%H:%M")
+    }
+    chat["messages"].append(scene_msg)
+    chat["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    save_db()
+
+    return jsonify({
+        "success": True,
+        "chat": chat,
+        "media": media_item | {"preview_url": public_url},
+        "credits": user["credits"]
+    })
+
 @app.route("/api/rp/chats/<chat_id>/regenerate", methods=["POST"])
 @login_required
 def api_regenerate_rp_message(chat_id):
@@ -1050,7 +1249,7 @@ def api_delete_ast_chat(chat_id):
     return jsonify({"success": True})
 
 
-# --- ORTAK SOHBET ODASI (@TXT, @IMG, @VID) API ---
+# --- ORTAK SOHBET ODASI (@TXT, @IMG, @VID) & MESAJ SİLME API ---
 
 @app.route("/api/global/sync", methods=["GET"])
 @login_required
@@ -1098,7 +1297,8 @@ def api_global_send():
                     "content": reply, "timestamp": datetime.now().strftime("%H:%M")
                 })
                 save_db()
-            except: pass
+            except Exception:
+                refund_credit(user, model_obj)
 
     elif content.startswith("@img "):
         prompt = content[5:].strip()
@@ -1111,12 +1311,20 @@ def api_global_send():
                 data_url, err = smart_generate_image(endpoint, headers, model_obj["api_model_id"], prompt, "", "1:1")
                 if data_url:
                     m_id, public_url, size = save_media_file_helper(data_url, "image")
+                    DB.setdefault("media", {})[m_id] = {
+                        "id": m_id, "user": user["username"], "type": "image",
+                        "prompt": prompt, "model": model_obj["name"], "aspect_ratio": "1:1",
+                        "file_path": public_url, "size_kb": size, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
                     DB["global_chat"].append({
-                        "id": "gmsg_" + uuid.uuid4().hex[:8], "user": user["username"], "type": "image",
+                        "id": m_id, "user": user["username"], "type": "image",
                         "content": prompt, "file_path": public_url, "timestamp": datetime.now().strftime("%H:%M")
                     })
                     save_db()
-            except: pass
+                else:
+                    refund_credit(user, model_obj)
+            except Exception:
+                refund_credit(user, model_obj)
 
     elif content.startswith("@vid "):
         prompt = content[5:].strip()
@@ -1129,16 +1337,124 @@ def api_global_send():
                 data_url, err = smart_generate_video(endpoint, headers, model_obj["api_model_id"], prompt, "", "16:9", "720p")
                 if data_url:
                     m_id, public_url, size = save_media_file_helper(data_url, "video")
+                    DB.setdefault("media", {})[m_id] = {
+                        "id": m_id, "user": user["username"], "type": "video",
+                        "prompt": prompt, "model": model_obj["name"], "aspect_ratio": "16:9",
+                        "file_path": public_url, "size_kb": size, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
                     DB["global_chat"].append({
-                        "id": "gmsg_" + uuid.uuid4().hex[:8], "user": user["username"], "type": "video",
+                        "id": m_id, "user": user["username"], "type": "video",
                         "content": prompt, "file_path": public_url, "timestamp": datetime.now().strftime("%H:%M")
                     })
                     save_db()
-            except: pass
+                else:
+                    refund_credit(user, model_obj)
+            except Exception:
+                refund_credit(user, model_obj)
 
     return jsonify({"success": True, "credits": user["credits"]})
 
-# --- GÖRSEL & VİDEO ÜRETİM API (FİZİKSEL DOSYA KAYDI) ---
+@app.route("/api/global/message/<msg_id>", methods=["DELETE"])
+@login_required
+def api_global_delete_message(msg_id):
+    user = get_current_user()
+    msgs = DB.get("global_chat", [])
+    target = next((m for m in msgs if m.get("id") == msg_id), None)
+    if not target:
+        return jsonify({"error": "Mesaj bulunamadı."}), 404
+    if target.get("user") != user["username"] and user.get("role") != "admin":
+        return jsonify({"error": "Sadece kendi mesajınızı silebilirsiniz."}), 403
+    DB["global_chat"] = [m for m in msgs if m.get("id") != msg_id]
+    save_db()
+    return jsonify({"success": True})
+
+# --- KULLANICILAR ARASI ÖZEL MESAJLAŞMA (DM) & MESAJ SİLME API ---
+
+def get_dm_room_key(u1, u2):
+    return "::".join(sorted([u1, u2]))
+
+@app.route("/api/dm/list", methods=["GET"])
+@login_required
+def api_dm_list():
+    user = get_current_user()
+    uname = user["username"]
+    DB.setdefault("dms", {})
+    users_info = []
+    for u_key, u_obj in DB["users"].items():
+        if u_key == uname or u_obj.get("banned"):
+            continue
+        rkey = get_dm_room_key(uname, u_key)
+        room_msgs = DB["dms"].get(rkey, [])
+        last_msg = room_msgs[-1] if room_msgs else None
+        users_info.append({
+            "username": u_key,
+            "persona_name": u_obj.get("persona_name", u_key),
+            "role": u_obj.get("role", "user"),
+            "last_message": last_msg["content"][:40] if last_msg else "",
+            "last_time": last_msg["timestamp"] if last_msg else ""
+        })
+    return jsonify({"success": True, "contacts": users_info})
+
+@app.route("/api/dm/<target_user>", methods=["GET"])
+@login_required
+def api_dm_get_messages(target_user):
+    user = get_current_user()
+    if target_user not in DB["users"]:
+        return jsonify({"error": "Kullanıcı bulunamadı."}), 404
+    rkey = get_dm_room_key(user["username"], target_user)
+    msgs = DB.setdefault("dms", {}).get(rkey, [])
+    return jsonify({"success": True, "messages": msgs[-100:]})
+
+@app.route("/api/dm/<target_user>/send", methods=["POST"])
+@login_required
+def api_dm_send_message(target_user):
+    user = get_current_user()
+    if target_user not in DB["users"]:
+        return jsonify({"error": "Alıcı kullanıcı bulunamadı."}), 404
+    data = request.json or {}
+    content = (data.get("content") or "").strip()
+    media_data = data.get("media_data")
+    if not content and not media_data:
+        return jsonify({"error": "Mesaj boş olamaz."}), 400
+
+    media_url = ""
+    if media_data:
+        try:
+            mtype = "video" if "video" in media_data[:30] else "image"
+            _, media_url, _ = save_media_file_helper(media_data, mtype)
+        except Exception:
+            pass
+
+    rkey = get_dm_room_key(user["username"], target_user)
+    DB.setdefault("dms", {}).setdefault(rkey, [])
+    msg_obj = {
+        "id": "dm_" + uuid.uuid4().hex[:8],
+        "sender": user["username"],
+        "receiver": target_user,
+        "content": content,
+        "media_url": media_url,
+        "timestamp": datetime.now().strftime("%H:%M")
+    }
+    DB["dms"][rkey].append(msg_obj)
+    save_db()
+    return jsonify({"success": True, "message": msg_obj})
+
+@app.route("/api/dm/<target_user>/message/<msg_id>", methods=["DELETE"])
+@login_required
+def api_dm_delete_message(target_user, msg_id):
+    user = get_current_user()
+    rkey = get_dm_room_key(user["username"], target_user)
+    msgs = DB.setdefault("dms", {}).get(rkey, [])
+    target = next((m for m in msgs if m.get("id") == msg_id), None)
+    if not target:
+        return jsonify({"error": "Mesaj bulunamadı."}), 404
+    if target.get("sender") != user["username"] and user.get("role") != "admin":
+        return jsonify({"error": "Bu mesajı silme yetkiniz yok."}), 403
+    DB["dms"][rkey] = [m for m in msgs if m.get("id") != msg_id]
+    save_db()
+    return jsonify({"success": True})
+
+# --- GÖRSEL & VİDEO ÜRETİM API (TXT2IMG, IMG2IMG, IMG2VID, VID2VID) ---
 
 @app.route("/api/media/generate", methods=["POST"])
 @login_required
@@ -1146,12 +1462,15 @@ def api_generate_media():
     user = get_current_user()
     data = request.json or {}
     media_type = data.get("type", "image")
+    mode = data.get("mode", "txt2" + ("img" if media_type == "image" else "vid"))
     prompt = (data.get("prompt") or "").strip()
     negative_prompt = (data.get("negative_prompt") or "").strip()
     aspect_ratio = data.get("aspect_ratio", "1:1")
     resolution = data.get("resolution", "720p")
     model_id = data.get("model_id")
     trained_id = data.get("trained_id", "")
+    source_media = data.get("source_media") or ""
+    strength = float(data.get("strength") or 0.65)
 
     if not prompt:
         return jsonify({"error": "Prompt alanı boş bırakılamaz."}), 400
@@ -1186,9 +1505,9 @@ def api_generate_media():
 
     try:
         if media_type == "image":
-            data_url, api_err = smart_generate_image(endpoint, headers, model_obj["api_model_id"], final_prompt, negative_prompt, aspect_ratio)
+            data_url, api_err = smart_generate_image(endpoint, headers, model_obj["api_model_id"], final_prompt, negative_prompt, aspect_ratio, source_media=source_media, strength=strength)
         else:
-            data_url, api_err = smart_generate_video(endpoint, headers, model_obj["api_model_id"], final_prompt, negative_prompt, aspect_ratio, resolution)
+            data_url, api_err = smart_generate_video(endpoint, headers, model_obj["api_model_id"], final_prompt, negative_prompt, aspect_ratio, resolution, source_media=source_media, strength=strength)
 
         if api_err or not data_url:
             refund_credit(user, model_obj)
@@ -1208,6 +1527,7 @@ def api_generate_media():
         "id": media_id,
         "user": user["username"],
         "type": media_type,
+        "mode": mode,
         "prompt": final_prompt,
         "model": model_obj["name"],
         "aspect_ratio": aspect_ratio,
@@ -1417,13 +1737,89 @@ def api_admin_import_db():
     if not isinstance(loaded, dict) or "settings" not in loaded or "users" not in loaded:
         return jsonify({"error": "Geçersiz JSON veritabanı formatı!"}), 400
 
-    loaded["users"]["Admin"] = loaded["users"].get("Admin", get_default_db()["users"]["Admin"])
-    loaded["users"]["Admin"]["password"] = "1234"
-    loaded["users"]["Admin"]["role"] = "admin"
+    # Mevcut medyaları koru (Eski JSON yedeklerinde media boşsa mevcut medyalar silinmesin)
+    existing_media = DB.get("media", {})
+    loaded = ensure_db_compatibility(loaded)
+    if not loaded.get("media") and existing_media:
+        loaded["media"] = existing_media
+
     with db_lock:
         DB = loaded
         save_db_unlocked()
     return jsonify({"success": True})
+
+# --- AYRI MEDYA JSON YEDEKLEME (DOWNLOAD & UPLOAD) API ---
+
+@app.route("/api/admin/media/export", methods=["GET"])
+@admin_required
+def api_admin_export_media():
+    """Üretilen medyaları ve fiziksel dosyalarını (base64 gömülü) ayrı bir JSON olarak indirir."""
+    media_bundle = {
+        "bundle_type": "nexus_media_backup",
+        "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "media": {}
+    }
+    for mid, m in DB.get("media", {}).items():
+        entry = dict(m)
+        fname = os.path.basename(m.get("file_path", ""))
+        fpath = os.path.join(MEDIA_DIR, fname)
+        if fname and os.path.exists(fpath):
+            try:
+                with open(fpath, "rb") as f:
+                    entry["file_b64"] = base64.b64encode(f.read()).decode("utf-8")
+                    entry["filename"] = fname
+            except Exception:
+                pass
+        media_bundle["media"][mid] = entry
+
+    json_bytes = json.dumps(media_bundle, ensure_ascii=False, indent=2).encode("utf-8")
+    stamp = datetime.now().strftime("%Y%m%d_%H%M")
+    return send_file(
+        BytesIO(json_bytes),
+        mimetype="application/json",
+        as_attachment=True,
+        download_name=f"nexus_media_backup_{stamp}.json"
+    )
+
+@app.route("/api/admin/media/import", methods=["POST"])
+@admin_required
+def api_admin_import_media():
+    """Ayrı indirilen Medya JSON yedeğini fiziksel dosyalarıyla birlikte geri yükler."""
+    if "file" in request.files:
+        f = request.files["file"]
+        loaded = json.load(f)
+    else:
+        loaded = request.json
+
+    if not isinstance(loaded, dict):
+        return jsonify({"error": "Geçersiz Medya JSON formatı!"}), 400
+
+    media_dict = loaded.get("media") if "media" in loaded and isinstance(loaded["media"], dict) else loaded
+    if not isinstance(media_dict, dict):
+        return jsonify({"error": "Medya verisi bulunamadı!"}), 400
+
+    restored_count = 0
+    with db_lock:
+        DB.setdefault("media", {})
+        for mid, m in media_dict.items():
+            if not isinstance(m, dict) or "type" not in m:
+                continue
+            entry = dict(m)
+            b64_content = entry.pop("file_b64", None)
+            fname = entry.pop("filename", None) or os.path.basename(entry.get("file_path", f"nexus_{mid}.png"))
+            if b64_content:
+                try:
+                    fpath = os.path.join(MEDIA_DIR, fname)
+                    with open(fpath, "wb") as wf:
+                        wf.write(base64.b64decode(b64_content))
+                    entry["file_path"] = f"/static/media/{fname}"
+                except Exception as e:
+                    print(f"Medya dosyası geri yükleme hatası ({mid}): {e}")
+            DB["media"][mid] = entry
+            restored_count += 1
+        save_db_unlocked()
+
+    return jsonify({"success": True, "restored_count": restored_count})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
