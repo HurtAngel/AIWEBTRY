@@ -2,30 +2,72 @@
 <html lang="tr" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- TELEFONDA ZOOM TAMAMEN KAPALI & MOBİL VIEWPORT OPTİMİZE -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>NEXUS AI // RP & Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #07080d; color: #f1f5f9; }
-        .glass { background: rgba(17, 20, 32, 0.72); backdrop-filter: blur(18px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        .glass-card { background: rgba(24, 28, 44, 0.55); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.07); }
+        * {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            box-sizing: border-box;
+        }
+        html, body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #06070c;
+            color: #f1f5f9;
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+            overscroll-behavior: none;
+            -webkit-text-size-adjust: 100%;
+            user-select: none;
+        }
+        input, textarea, select {
+            user-select: text;
+            font-size: 16px !important; /* iOS Safari otomatik zoom engeli */
+        }
+        @media (min-width: 1024px) {
+            input, textarea, select {
+                font-size: 13px !important;
+            }
+        }
+        /* PC için zengin cam efekti, Mobil için sıfır kasma sağlayan GPU dostu mat katman */
+        .glass {
+            background: #0d101b;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-card {
+            background: #131726;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        @media (min-width: 1024px) {
+            .glass {
+                background: rgba(15, 18, 30, 0.78);
+                backdrop-filter: blur(16px);
+            }
+            .glass-card {
+                background: rgba(24, 28, 44, 0.6);
+                backdrop-filter: blur(10px);
+            }
+        }
         .rp-action { color: #c084fc; font-style: italic; }
-        .rp-quote { color: #fde047; font-weight: 500; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #07080d; }
-        ::-webkit-scrollbar-thumb { background: #2e364f; border-radius: 9999px; }
+        .rp-quote { color: #fde047; font-weight: 600; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #06070c; }
+        ::-webkit-scrollbar-thumb { background: #262d42; border-radius: 9999px; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="h-screen overflow-hidden flex flex-col selection:bg-purple-600 selection:text-white">
+<body class="flex flex-col lg:flex-row selection:bg-purple-600 selection:text-white">
 
     <!-- GİRİŞ / KAYIT EKRANI -->
-    <div id="authScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-[#07080d] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/30 via-[#07080d] to-[#07080d] p-4 hidden">
-        <div class="glass w-full max-w-md rounded-3xl p-8 shadow-2xl border border-purple-500/20">
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 shadow-lg shadow-purple-600/30 mb-4 text-2xl font-extrabold">N</div>
+    <div id="authScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-[#06070c] p-4 hidden">
+        <div class="glass w-full max-w-md rounded-3xl p-7 shadow-2xl border border-purple-500/25">
+            <div class="text-center mb-7">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 shadow-lg shadow-purple-600/30 mb-3 text-2xl font-extrabold">N</div>
                 <h1 id="authSiteTitle" class="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-purple-200 to-indigo-400 bg-clip-text text-transparent">NEXUS AI STUDIO</h1>
                 <p id="authSiteSubtitle" class="text-xs text-slate-400 mt-1">Yeni Nesil Sansürsüz Rol Yapma ve Üretim Stüdyosu</p>
             </div>
@@ -33,167 +75,296 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Kullanıcı Adı</label>
-                    <input id="authUser" type="text" placeholder="Kullanıcı adınız" class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/70 focus:border-purple-500 focus:outline-none text-sm">
+                    <input id="authUser" type="text" placeholder="Kullanıcı adınız" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700/70 focus:border-purple-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Şifre</label>
-                    <input id="authPass" type="password" placeholder="••••" class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/70 focus:border-purple-500 focus:outline-none text-sm">
+                    <input id="authPass" type="password" placeholder="••••" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700/70 focus:border-purple-500 focus:outline-none">
                 </div>
                 <p id="authError" class="text-xs text-rose-400 hidden"></p>
                 <div class="grid grid-cols-2 gap-3 pt-2">
-                    <button onclick="submitAuth('login')" class=" py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 font-semibold text-sm shadow-lg shadow-purple-600/25 transition">Giriş Yap</button>
-                    <button onclick="submitAuth('register')" class="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold text-sm border border-slate-700 transition">Kayıt Ol</button>
+                    <button onclick="submitAuth('login')" class="py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 font-bold text-sm shadow-lg">Giriş Yap</button>
+                    <button onclick="submitAuth('register')" class="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-sm border border-slate-700">Kayıt Ol</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ANA UYGULAMA EKRANI -->
-    <header class="glass h-16 px-4 lg:px-6 flex items-center justify-between shrink-0 z-20">
-        <div class="flex items-center gap-3 shrink-0">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-extrabold shadow-md shadow-purple-600/30">N</div>
-            <div class="hidden sm:block">
-                <h1 id="navSiteTitle" class="font-bold text-sm lg:text-base tracking-tight">NEXUS AI</h1>
-                <p id="navWelcome" class="text-[11px] text-slate-400">Stüdyo Aktif</p>
+    <!-- ==================== PC SOL DİKEY NAVİGASYON (Sadece Masaüstü lg+) ==================== -->
+    <aside class="hidden lg:flex flex-col w-60 glass border-r border-white/5 shrink-0 justify-between p-4 z-30">
+        <div class="space-y-6">
+            <div class="flex items-center gap-3 px-2">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-extrabold text-lg shadow-md shadow-purple-600/30">N</div>
+                <div class="min-w-0">
+                    <h1 id="navSiteTitle" class="font-extrabold text-sm tracking-tight truncate">NEXUS AI</h1>
+                    <p id="navWelcome" class="text-[11px] text-slate-400 truncate">Stüdyo Aktif</p>
+                </div>
+            </div>
+
+            <nav class="space-y-1.5">
+                <button onclick="switchTab('rp')" id="tabBtn_rp" class="tab-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition bg-purple-600 text-white">
+                    <span>🎭</span> <span>AI Roleplay</span>
+                </button>
+                <button onclick="switchTab('assistant')" id="tabBtn_assistant" class="tab-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition text-slate-400 hover:text-white hover:bg-white/5">
+                    <span>💬</span> <span>AI Asistan</span>
+                </button>
+                <button onclick="switchTab('global')" id="tabBtn_global" class="tab-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition text-slate-400 hover:text-white hover:bg-white/5">
+                    <span>🌐</span> <span>Ortak Oda</span>
+                </button>
+                <button onclick="switchTab('dm')" id="tabBtn_dm" class="tab-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition text-slate-400 hover:text-white hover:bg-white/5">
+                    <span>💌</span> <span>Özel Mesajlar (DM)</span>
+                </button>
+                <button onclick="switchTab('image')" id="tabBtn_image" class="tab-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition text-slate-400 hover:text-white hover:bg-white/5">
+                    <span>🎨</span> <span>Görsel Stüdyo</span>
+                </button>
+                <button onclick="switchTab('video')" id="tabBtn_video" class="tab-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition text-slate-400 hover:text-white hover:bg-white/5">
+                    <span>🎬</span> <span>Video Stüdyo</span>
+                </button>
+                <button onclick="switchTab('studio')" id="tabBtn_studio" class="tab-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition text-slate-400 hover:text-white hover:bg-white/5">
+                    <span>🧬</span> <span>Karakter & LoRA</span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="space-y-2.5 border-t border-white/10 pt-4">
+            <div class="px-3.5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center justify-between">
+                <span>⚡ Kredi</span>
+                <span id="userCredits">0</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="openPersonaModal()" class="flex-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold border border-white/10 truncate text-left">
+                    👤 <span id="userNameBadge">Kullanıcı</span>
+                </button>
+                <a id="adminPanelBtn" href="/admin" class="hidden px-3 py-2 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-300 text-xs font-bold" title="Admin Paneli">⚙️</a>
+                <button onclick="logout()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 text-xs" title="Çıkış">✕</button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ==================== MOBİL ÜST BAR (Sadece Telefon <lg) ==================== -->
+    <header class="lg:hidden glass h-14 px-3.5 flex items-center justify-between shrink-0 z-30 border-b border-white/10">
+        <div class="flex items-center gap-2.5">
+            <button id="mobileDrawerBtn" onclick="toggleMobileDrawer()" class="w-9 h-9 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-sm font-bold text-purple-300">
+                ☰
+            </button>
+            <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-extrabold text-xs">N</div>
+                <span id="mobileHeaderTitle" class="font-bold text-xs tracking-tight truncate max-w-[130px]">AI Roleplay</span>
             </div>
         </div>
 
-        <!-- ANA SEKMELER (Mobil İçin Yatay Kaydırma) -->
-        <nav class="flex items-center gap-1 bg-slate-900/80 p-1 rounded-2xl border border-white/5 overflow-x-auto scrollbar-hide max-w-full mx-2 flex-nowrap">
-            <button onclick="switchTab('rp')" id="tabBtn_rp" class="tab-btn shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition bg-purple-600 text-white">🎭 AI Roleplay</button>
-            <button onclick="switchTab('assistant')" id="tabBtn_assistant" class="tab-btn shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white">💬 Asistan</button>
-            <button onclick="switchTab('global')" id="tabBtn_global" class="tab-btn shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white">🌐 Ortak Oda</button>
-            <button onclick="switchTab('image')" id="tabBtn_image" class="tab-btn shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white">🎨 Görsel</button>
-            <button onclick="switchTab('video')" id="tabBtn_video" class="tab-btn shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white">🎬 Video</button>
-            <button onclick="switchTab('studio')" id="tabBtn_studio" class="tab-btn shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white">🧬 Stüdyo</button>
-        </nav>
-
-        <!-- KULLANICI BİLGİSİ -->
-        <div class="flex items-center gap-2.5 shrink-0">
-            <div class="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1.5">
-                <span>⚡</span> <span id="userCredits">0</span>
+        <div class="flex items-center gap-1.5">
+            <div class="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-bold flex items-center gap-1">
+                <span>⚡</span> <span id="userCreditsMobile">0</span>
             </div>
-            <button onclick="openPersonaModal()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium border border-white/10 transition" title="RP Personanı Düzenle">
-                👤 <span id="userNameBadge" class="hidden sm:inline">Kullanıcı</span>
-            </button>
-            <a id="adminPanelBtn" href="/admin" class="hidden px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 text-xs font-bold transition">
-                ⚙️
-            </a>
-            <button onclick="logout()" class="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-950 text-slate-400 hover:text-rose-300 text-xs transition" title="Çıkış Yap">✕</button>
+            <button onclick="openPersonaModal()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-[11px] border border-white/10">👤</button>
+            <a id="adminPanelBtnMobile" href="/admin" class="hidden px-2.5 py-1 rounded-lg bg-rose-600/20 border border-rose-500/40 text-rose-300 text-[11px]">⚙️</a>
+            <button onclick="logout()" class="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 text-[11px]">✕</button>
         </div>
     </header>
 
-    <!-- İÇERİK ALANI -->
-    <main class="flex-1 overflow-hidden relative flex flex-col">
+    <!-- MOBİL SÜRGÜLÜ ÇEKMECE KARARTMASI -->
+    <div id="mobileDrawerBackdrop" onclick="closeMobileDrawer()" class="fixed inset-0 bg-black/75 z-40 hidden lg:hidden"></div>
+
+    <!-- ==================== ANA İÇERİK ALANI ==================== -->
+    <main class="flex-1 overflow-hidden relative flex flex-col h-full">
 
         <!-- 1. SEKME: AI ROLEPLAY -->
         <section id="tab_rp" class="h-full flex flex-col lg:flex-row overflow-hidden w-full">
-            <!-- Sol Panel -->
-            <aside class="w-full lg:w-80 glass lg:border-r border-b lg:border-b-0 border-white/5 flex flex-col shrink-0 max-h-[35vh] lg:max-h-full overflow-y-auto p-4 space-y-5">
+            <!-- Karakter & Sohbet Yan Paneli (PC'de sabit, Mobilde Sürgülü Çekmece) -->
+            <aside id="rpSidebarPanel" class="fixed lg:static inset-y-0 left-0 z-50 w-72 lg:w-80 glass border-r border-white/10 flex flex-col shrink-0 h-full overflow-y-auto p-4 space-y-5 -translate-x-full lg:translate-x-0 transition-transform duration-200">
+                <div class="flex items-center justify-between lg:hidden pb-2 border-b border-white/10">
+                    <span class="text-xs font-extrabold text-purple-300">🎭 Karakterler & Sohbetler</span>
+                    <button onclick="closeMobileDrawer()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs">✕</button>
+                </div>
+
                 <div>
-                    <div class="flex items-center justify-between mb-2.5">
+                    <div class="flex items-center justify-between mb-2">
                         <h2 class="text-xs font-bold uppercase tracking-wider text-purple-400">Senin Karakterlerin</h2>
-                        <button onclick="switchTab('studio')" class="text-[11px] text-purple-300 hover:underline">+ Yeni</button>
+                        <button onclick="switchTab('studio'); closeMobileDrawer();" class="text-[11px] text-purple-300 font-semibold">+ Yeni</button>
                     </div>
                     <div id="rpCharListMy" class="space-y-2"></div>
                 </div>
 
-                <div class="border-t border-white/10 pt-4">
-                    <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2.5">Topluluk Vitrini</h2>
+                <div class="border-t border-white/10 pt-3">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2">Topluluk Vitrini</h2>
                     <div id="rpCharListCommunity" class="space-y-2"></div>
                 </div>
 
-                <div class="border-t border-white/10 pt-4 flex-1">
-                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Kayıtlı Sohbetlerin</h2>
+                <div class="border-t border-white/10 pt-3 flex-1">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Kayıtlı Sohbetlerin</h2>
                     <div id="rpChatList" class="space-y-1.5"></div>
                 </div>
             </aside>
 
-            <!-- Sağ Panel (Sohbet Ekranı) -->
-            <div class="flex-1 flex flex-col h-full overflow-hidden bg-[#0a0c14]">
-                <div class="h-14 px-4 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-950/60">
-                    <div class="flex items-center gap-3">
-                        <img id="activeCharAvatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100" class="w-9 h-9 rounded-xl object-cover border border-purple-500/40">
-                        <div>
-                            <h3 id="activeCharName" class="text-sm font-bold">Karakter Seçin</h3>
-                            <p id="activeCharTitle" class="text-[11px] text-slate-400 hidden sm:block">Sol menüden bir karaktere tıklayarak RP başlatın</p>
+            <!-- Sağ Panel (RP Sohbet Ekranı) -->
+            <div class="flex-1 flex flex-col h-full overflow-hidden bg-[#080a12]">
+                <div class="h-13 px-3.5 py-2 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-950/80 gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <img id="activeCharAvatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100" class="w-9 h-9 rounded-xl object-cover border border-purple-500/40 shrink-0">
+                        <div class="min-w-0">
+                            <h3 id="activeCharName" class="text-xs lg:text-sm font-bold truncate">Karakter Seçin</h3>
+                            <p id="activeCharTitle" class="text-[10px] text-slate-400 truncate">Menüden bir karaktere tıklayın</p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <select id="rpModelSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"></select>
-                        <button onclick="toggleMemoryDrawer()" class="px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/60 border border-purple-500/30 text-purple-300 text-xs font-medium transition">
-                            🧠 Hafıza
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <select id="rpModelSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-[11px] text-slate-200 max-w-[130px] sm:max-w-[180px] focus:outline-none"></select>
+                        <button onclick="toggleSceneDrawer()" class="px-2.5 py-1.5 rounded-xl bg-pink-950/70 hover:bg-pink-900/70 border border-pink-500/40 text-pink-300 text-[11px] font-semibold" title="Karaktere Özel img2img Sahne Üret">
+                            📸 <span class="hidden sm:inline">Sahne</span>
+                        </button>
+                        <button onclick="toggleMemoryDrawer()" class="px-2.5 py-1.5 rounded-xl bg-purple-950/70 hover:bg-purple-900/70 border border-purple-500/30 text-purple-300 text-[11px] font-semibold">
+                            🧠 <span class="hidden sm:inline">Hafıza</span>
                         </button>
                     </div>
                 </div>
 
-                <div id="memoryDrawer" class="hidden bg-purple-950/20 border-b border-purple-500/30 p-3.5 text-xs space-y-2">
+                <!-- RP SAHNE GÖRSELİ (IMG2IMG REFERANSLI) ÇEKMECESİ -->
+                <div id="rpSceneDrawer" class="hidden bg-pink-950/20 border-b border-pink-500/30 p-3 text-xs space-y-2.5 shrink-0">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-pink-300">📸 Karakter Referanslı Sahne Üretimi (img2img)</span>
+                        <span class="text-[10px] text-slate-400">Karakterin referans görseli baz alınır</span>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input id="rpScenePrompt" type="text" placeholder="Sahneyi tarif et (Boş bırakırsan son mesajdan üretir)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs">
+                        <div class="flex items-center gap-2">
+                            <label class="text-[10px] text-slate-400 whitespace-nowrap">Sadakat:</label>
+                            <input id="rpSceneStrength" type="range" min="0.25" max="0.85" step="0.05" value="0.60" class="w-20 accent-pink-500">
+                            <button onclick="generateRpSceneImage()" id="rpSceneBtn" class="px-3.5 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs whitespace-nowrap">✨ Sahne Çiz</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HAFIZA ÇEKMECESİ -->
+                <div id="memoryDrawer" class="hidden bg-purple-950/20 border-b border-purple-500/30 p-3 text-xs space-y-2 shrink-0">
                     <div class="flex items-center justify-between">
                         <span class="font-bold text-purple-300">📌 Akıllı Hafıza Özeti</span>
                         <button onclick="manualCompressMemory()" class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-semibold">Sıkıştır & Özetle</button>
                     </div>
-                    <p id="memorySummaryText" class="text-slate-300 whitespace-pre-line bg-slate-950/70 p-2.5 rounded-xl border border-white/5">Henüz özetlenmiş uzun süreli hafıza yok.</p>
+                    <p id="memorySummaryText" class="text-slate-300 whitespace-pre-line bg-slate-950/70 p-2.5 rounded-xl border border-white/5 max-h-28 overflow-y-auto">Henüz özetlenmiş uzun süreli hafıza yok.</p>
                 </div>
 
-                <div id="rpMessagesBox" class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4"></div>
+                <div id="rpMessagesBox" class="flex-1 overflow-y-auto p-3.5 lg:p-6 space-y-3.5"></div>
 
-                <div class="p-3.5 border-t border-white/5 bg-slate-950/80 flex items-end gap-2 shrink-0">
-                    <textarea id="rpInput" rows="2" placeholder="*Bir aksiyon yaz* veya &quot;bir şey söyle...&quot;" class="flex-1 bg-slate-900/90 border border-slate-700/80 rounded-2xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none resize-none"></textarea>
-                    <button onclick="regenerateLastRp()" class="px-3.5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-white/10 transition" title="Yeniden Üret">🔄</button>
-                    <button onclick="sendRpMessage()" id="rpSendBtn" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 font-bold text-xs shadow-lg transition">Gönder</button>
+                <div class="p-2.5 lg:p-3.5 border-t border-white/5 bg-slate-950/90 flex items-end gap-2 shrink-0">
+                    <textarea id="rpInput" rows="2" placeholder="*Bir aksiyon yaz* veya &quot;bir şey söyle...&quot;" class="flex-1 bg-slate-900 border border-slate-700/80 rounded-2xl px-3.5 py-2 text-xs lg:text-sm focus:border-purple-500 focus:outline-none resize-none"></textarea>
+                    <button onclick="regenerateLastRp()" class="px-3 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-white/10" title="Yeniden Üret">🔄</button>
+                    <button onclick="sendRpMessage()" id="rpSendBtn" class="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 font-bold text-xs shadow-lg">Gönder</button>
                 </div>
             </div>
         </section>
 
-        <!-- 2. SEKME: ASİSTAN (Geçmiş Destekli) -->
+        <!-- 2. SEKME: ASİSTAN -->
         <section id="tab_assistant" class="h-full hidden flex-col lg:flex-row overflow-hidden w-full">
-            <aside class="w-full lg:w-72 glass lg:border-r border-b lg:border-b-0 border-white/5 flex flex-col shrink-0 max-h-[30vh] lg:max-h-full overflow-y-auto p-4 space-y-4">
+            <aside id="astSidebarPanel" class="fixed lg:static inset-y-0 left-0 z-50 w-72 glass border-r border-white/10 flex flex-col shrink-0 h-full overflow-y-auto p-4 space-y-4 -translate-x-full lg:translate-x-0 transition-transform duration-200">
                 <div class="flex items-center justify-between">
                     <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Asistan Sohbetleri</h2>
-                    <button onclick="resetAssistantChat()" class="text-[11px] px-2 py-1 bg-purple-600 rounded text-white">+ Yeni</button>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="resetAssistantChat(); closeMobileDrawer();" class="text-[11px] px-2.5 py-1 bg-purple-600 rounded-lg text-white font-bold">+ Yeni</button>
+                        <button onclick="closeMobileDrawer()" class="lg:hidden px-2 py-1 rounded-lg bg-slate-800 text-xs">✕</button>
+                    </div>
                 </div>
                 <div id="astChatList" class="space-y-1.5"></div>
             </aside>
 
-            <div class="flex-1 flex flex-col h-full overflow-hidden bg-[#0a0c14]">
-                <div class="p-4 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-950/60">
+            <div class="flex-1 flex flex-col h-full overflow-hidden bg-[#080a12]">
+                <div class="p-3.5 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-950/80">
                     <div>
-                        <h2 class="font-bold text-sm">💬 AI Asistan</h2>
-                        <p class="text-xs text-slate-400 hidden sm:block">Rol bağımsız soru-cevap, metin yazımı ve çeviri</p>
+                        <h2 class="font-bold text-xs lg:text-sm">💬 AI Asistan</h2>
+                        <p class="text-[11px] text-slate-400 hidden sm:block">Soru-cevap, kodlama, metin yazımı ve çeviri</p>
                     </div>
-                    <select id="astModelSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs"></select>
+                    <select id="astModelSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs"></select>
                 </div>
-                <div id="astMessagesBox" class="flex-1 overflow-y-auto p-5 space-y-4"></div>
-                <div class="p-3.5 border-t border-white/5 flex gap-2 shrink-0 bg-slate-950/80">
-                    <input id="astInput" type="text" placeholder="Asistana istediğini sor..." onkeydown="if(event.key==='Enter') sendAssistantMessage()" class="flex-1 bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-sm focus:border-purple-500 focus:outline-none">
-                    <button onclick="sendAssistantMessage()" class="px-6 py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 font-bold text-xs">Gönder</button>
+                <div id="astMessagesBox" class="flex-1 overflow-y-auto p-4 space-y-3.5"></div>
+                <div class="p-3 border-t border-white/5 flex gap-2 shrink-0 bg-slate-950/90">
+                    <input id="astInput" type="text" placeholder="Asistana istediğini sor..." onkeydown="if(event.key==='Enter') sendAssistantMessage()" class="flex-1 bg-slate-900 border border-slate-700 rounded-2xl px-4 py-2.5 text-sm focus:border-purple-500 focus:outline-none">
+                    <button onclick="sendAssistantMessage()" class="px-5 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 font-bold text-xs">Gönder</button>
                 </div>
             </div>
         </section>
 
-        <!-- 3. SEKME: ORTAK SOHBET ODASI -->
-        <section id="tab_global" class="h-full hidden flex-col max-w-5xl mx-auto w-full lg:p-4 p-0">
+        <!-- 3. SEKME: ORTAK SOHBET ODASI (MESAJ SİLME DESTEKLİ) -->
+        <section id="tab_global" class="h-full hidden flex-col max-w-5xl mx-auto w-full lg:p-4 p-0 overflow-hidden">
             <div class="glass lg:rounded-3xl rounded-none flex-1 flex flex-col overflow-hidden">
-                <div class="p-4 border-b border-white/5 shrink-0 flex justify-between items-center bg-slate-950/60">
+                <div class="p-3.5 border-b border-white/5 shrink-0 flex justify-between items-center bg-slate-950/80">
                     <div>
-                        <h2 class="font-bold text-sm text-cyan-300">🌐 Global Ortak Oda</h2>
-                        <p class="text-[11px] text-slate-400">Üretim Komutları: <span class="text-purple-300 font-mono">@txt</span>, <span class="text-pink-300 font-mono">@img</span>, <span class="text-indigo-300 font-mono">@vid</span></p>
+                        <h2 class="font-bold text-xs lg:text-sm text-cyan-300">🌐 Global Ortak Oda</h2>
+                        <p class="text-[10px] text-slate-400">Komutlar: <span class="text-purple-300 font-mono">@txt</span>, <span class="text-pink-300 font-mono">@img</span>, <span class="text-indigo-300 font-mono">@vid</span></p>
                     </div>
-                    <button onclick="loadGlobalChat()" class="text-slate-400 hover:text-white px-2 text-xs">🔄 Yenile</button>
+                    <button onclick="loadGlobalChat()" class="text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-900 text-xs">🔄 Yenile</button>
                 </div>
-                <div id="globalMessagesBox" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
-                <div class="p-3.5 border-t border-white/5 flex gap-2 shrink-0 bg-slate-950/80">
-                    <input id="globalInput" type="text" placeholder="Mesaj yaz veya @img / @vid komutu kullan..." onkeydown="if(event.key==='Enter') sendGlobalMessage()" class="flex-1 bg-slate-900 border border-slate-700 rounded-2xl px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none">
-                    <button onclick="sendGlobalMessage()" class="px-6 py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 font-bold text-xs text-white">Gönder</button>
+                <div id="globalMessagesBox" class="flex-1 overflow-y-auto p-3.5 space-y-3"></div>
+                <div class="p-3 border-t border-white/5 flex gap-2 shrink-0 bg-slate-950/90">
+                    <input id="globalInput" type="text" placeholder="Mesaj yaz veya @img / @vid komutu kullan..." onkeydown="if(event.key==='Enter') sendGlobalMessage()" class="flex-1 bg-slate-900 border border-slate-700 rounded-2xl px-4 py-2.5 text-sm focus:border-cyan-500 focus:outline-none">
+                    <button onclick="sendGlobalMessage()" class="px-5 py-2.5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 font-bold text-xs text-white">Gönder</button>
                 </div>
             </div>
         </section>
 
-        <!-- 4. SEKME: GÖRSEL ÜRETİM -->
-        <section id="tab_image" class="h-full hidden overflow-y-auto p-4 lg:p-6 w-full">
-            <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="glass rounded-3xl p-5 space-y-4 h-fit">
-                    <h2 class="font-bold text-base text-pink-400">🎨 Görsel Üretim Stüdyosu</h2>
+        <!-- 4. YENİ SEKME: KULLANICILAR ARASI DM (ÖZEL MESAJLAŞMA & SİLME) -->
+        <section id="tab_dm" class="h-full hidden flex-col lg:flex-row overflow-hidden w-full">
+            <aside id="dmSidebarPanel" class="fixed lg:static inset-y-0 left-0 z-50 w-72 glass border-r border-white/10 flex flex-col shrink-0 h-full overflow-y-auto p-4 space-y-3 -translate-x-full lg:translate-x-0 transition-transform duration-200">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-emerald-400">💌 Kullanıcılar (DM)</h2>
+                    <button onclick="closeMobileDrawer()" class="lg:hidden px-2 py-1 rounded-lg bg-slate-800 text-xs">✕</button>
+                </div>
+                <div id="dmContactsList" class="space-y-1.5"></div>
+            </aside>
+
+            <div class="flex-1 flex flex-col h-full overflow-hidden bg-[#080a12]">
+                <div class="p-3.5 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-950/80">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 font-bold text-xs">💌</div>
+                        <div>
+                            <h3 id="activeDmUserTitle" class="font-bold text-xs lg:text-sm">Kişi Seçin</h3>
+                            <p class="text-[10px] text-slate-400">Özel mesajlaşma (Mesajlarınızı silebilirsiniz)</p>
+                        </div>
+                    </div>
+                    <button onclick="loadDmMessages()" class="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-900">🔄</button>
+                </div>
+
+                <div id="dmMessagesBox" class="flex-1 overflow-y-auto p-4 space-y-3">
+                    <div class="text-center text-slate-500 text-xs mt-16">Sol menüden mesajlaşmak istediğiniz kullanıcıyı seçin.</div>
+                </div>
+
+                <div class="p-3 border-t border-white/5 flex items-center gap-2 shrink-0 bg-slate-950/90">
+                    <label class="px-3 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs cursor-pointer border border-white/10" title="Görsel Gönder">
+                        📎
+                        <input id="dmMediaFile" type="file" accept="image/*" onchange="encodeDmAttachment(this)" class="hidden">
+                    </label>
+                    <input id="dmInput" type="text" placeholder="Özel mesajınızı yazın..." onkeydown="if(event.key==='Enter') sendDmMessage()" class="flex-1 bg-slate-900 border border-slate-700 rounded-2xl px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                    <button onclick="sendDmMessage()" class="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 font-bold text-xs text-white">Gönder</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. SEKME: GÖRSEL ÜRETİM (TXT2IMG & IMG2IMG) -->
+        <section id="tab_image" class="h-full hidden overflow-y-auto p-3.5 lg:p-6 w-full">
+            <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-5 pb-8">
+                <div class="glass rounded-3xl p-4 lg:p-5 space-y-3.5 h-fit">
+                    <div class="flex items-center justify-between">
+                        <h2 class="font-bold text-sm lg:text-base text-pink-400">🎨 Görsel Stüdyosu</h2>
+                        <span id="imgModeBadge" class="text-[10px] px-2 py-0.5 rounded-lg bg-pink-500/20 text-pink-300 font-bold">Text-to-Image</span>
+                    </div>
+
+                    <!-- IMG2IMG KAYNAK DOSYA YÜKLEME ALANI -->
+                    <div class="p-3 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[11px] font-semibold text-slate-300">🖼️ Kaynak Görsel (img2img Opsiyonel)</label>
+                            <button onclick="clearSourceMedia('image')" id="clearImgSourceBtn" class="hidden text-[10px] text-rose-400 hover:underline">Temizle ✕</button>
+                        </div>
+                        <input id="imgSourceFile" type="file" accept="image/*" onchange="handleSourceFileUpload(this, 'image')" class="text-[11px] text-slate-400 w-full">
+                        <div id="imgSourcePreviewWrap" class="hidden items-center gap-3 pt-1">
+                            <img id="imgSourcePreview" src="" class="w-14 h-14 rounded-xl object-cover border border-pink-500/40">
+                            <div class="flex-1 space-y-1">
+                                <div class="flex justify-between text-[10px] text-slate-400">
+                                    <span>Dönüşüm Gücü (Strength)</span>
+                                    <span id="imgStrengthVal">0.65</span>
+                                </div>
+                                <input id="imgStrength" type="range" min="0.15" max="0.95" step="0.05" value="0.65" oninput="document.getElementById('imgStrengthVal').innerText=this.value" class="w-full accent-pink-500">
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="text-xs text-slate-400">Prompt (Görsel Tarifi)</label>
                         <textarea id="imgPrompt" rows="3" placeholder="A dark fantasy assassin girl standing in neon rain, cinematic..." class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs"></textarea>
@@ -202,7 +373,7 @@
                         <label class="text-xs text-slate-400">Negatif Prompt (İstenmeyenler)</label>
                         <input id="imgNegPrompt" type="text" placeholder="blurry, low quality, deformed" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs">
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-2 gap-2.5">
                         <div>
                             <label class="text-xs text-slate-400">Görsel Modeli</label>
                             <select id="imgModelSelect" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs"></select>
@@ -211,8 +382,8 @@
                             <label class="text-xs text-slate-400">En / Boy Oranı</label>
                             <select id="imgRatio" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs">
                                 <option value="1:1">1:1 (Kare)</option>
-                                <option value="16:9">16:9 (Yatay Sinematik)</option>
-                                <option value="9:16">9:16 (Dikey Portre)</option>
+                                <option value="16:9">16:9 (Yatay)</option>
+                                <option value="9:16">9:16 (Dikey)</option>
                             </select>
                         </div>
                     </div>
@@ -220,21 +391,44 @@
                         <label class="text-xs text-slate-400">Eğitilmiş Karakter / Stil Modeli (LoRA)</label>
                         <select id="imgTrainedSelect" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs"></select>
                     </div>
-                    <button onclick="generateMedia('image')" id="btnGenImg" class="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-bold text-xs shadow-lg">🎨 Görsel Üret</button>
+                    <button onclick="generateMedia('image')" id="btnGenImg" class="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 font-bold text-xs shadow-lg">🎨 Görsel Üret</button>
                 </div>
 
                 <div class="lg:col-span-2 space-y-3">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Kayıtlı Görselleriniz</h3>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Kayıtlı Görselleriniz (Tek Tıkla img2img / img2vid Aktar)</h3>
                     <div id="imageGallery" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
                 </div>
             </div>
         </section>
 
-        <!-- 5. SEKME: VİDEO ÜRETİM -->
-        <section id="tab_video" class="h-full hidden overflow-y-auto p-4 lg:p-6 w-full">
-            <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="glass rounded-3xl p-5 space-y-4 h-fit">
-                    <h2 class="font-bold text-base text-indigo-400">🎬 Karaktere Özel Video Üretimi</h2>
+        <!-- 6. SEKME: VİDEO ÜRETİM (TXT2VID, IMG2VID, VID2VID) -->
+        <section id="tab_video" class="h-full hidden overflow-y-auto p-3.5 lg:p-6 w-full">
+            <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-5 pb-8">
+                <div class="glass rounded-3xl p-4 lg:p-5 space-y-3.5 h-fit">
+                    <div class="flex items-center justify-between">
+                        <h2 class="font-bold text-sm lg:text-base text-indigo-400">🎬 Video Stüdyosu</h2>
+                        <span id="vidModeBadge" class="text-[10px] px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 font-bold">Text-to-Video</span>
+                    </div>
+
+                    <!-- IMG2VID / VID2VID KAYNAK DOSYA YÜKLEME ALANI -->
+                    <div class="p-3 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[11px] font-semibold text-slate-300">🎞️ Kaynak Görsel/Video (img2vid / vid2vid)</label>
+                            <button onclick="clearSourceMedia('video')" id="clearVidSourceBtn" class="hidden text-[10px] text-rose-400 hover:underline">Temizle ✕</button>
+                        </div>
+                        <input id="vidSourceFile" type="file" accept="image/*,video/*" onchange="handleSourceFileUpload(this, 'video')" class="text-[11px] text-slate-400 w-full">
+                        <div id="vidSourcePreviewWrap" class="hidden items-center gap-3 pt-1">
+                            <div id="vidSourceThumbBox" class="w-14 h-14 rounded-xl overflow-hidden border border-indigo-500/40 bg-black flex items-center justify-center text-[10px] text-indigo-300">Medya</div>
+                            <div class="flex-1 space-y-1">
+                                <div class="flex justify-between text-[10px] text-slate-400">
+                                    <span>Hareket / Dönüşüm Gücü</span>
+                                    <span id="vidStrengthVal">0.65</span>
+                                </div>
+                                <input id="vidStrength" type="range" min="0.15" max="0.95" step="0.05" value="0.65" oninput="document.getElementById('vidStrengthVal').innerText=this.value" class="w-full accent-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="text-xs text-slate-400">Video & Hareket Promptu</label>
                         <textarea id="vidPrompt" rows="3" placeholder="Seraphina slowly turns her head in the rain, neon reflections flickering..." class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs"></textarea>
@@ -243,13 +437,13 @@
                         <label class="text-xs text-slate-400">Video Üretim Modeli</label>
                         <select id="vidModelSelect" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs"></select>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-2 gap-2.5">
                         <div>
-                            <label class="text-xs text-slate-400">Çözünürlük Seçici</label>
+                            <label class="text-xs text-slate-400">Çözünürlük</label>
                             <select id="vidResolution" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs">
-                                <option value="480p">480p (Ekonomik)</option>
-                                <option value="720p" selected>720p (Standart)</option>
-                                <option value="1080p">1080p (Yüksek Kalite)</option>
+                                <option value="480p">480p (Hızlı)</option>
+                                <option value="720p" selected>720p (HD)</option>
+                                <option value="1080p">1080p (Full HD)</option>
                             </select>
                         </div>
                         <div>
@@ -257,7 +451,7 @@
                             <select id="vidTrainedSelect" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs"></select>
                         </div>
                     </div>
-                    <button onclick="generateMedia('video')" id="btnGenVid" class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 font-bold text-xs shadow-lg">🎬 Video Üret</button>
+                    <button onclick="generateMedia('video')" id="btnGenVid" class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 font-bold text-xs shadow-lg">🎬 Video Üret</button>
                 </div>
 
                 <div class="lg:col-span-2 space-y-3">
@@ -267,28 +461,45 @@
             </div>
         </section>
 
-        <!-- 6. SEKME: STÜDYO (KARAKTER & EĞİTİM) -->
-        <section id="tab_studio" class="h-full hidden overflow-y-auto p-4 lg:p-6 w-full">
-            <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 7. SEKME: STÜDYO (KARAKTER + 1 REFERANS GÖRSEL ÜRETİMİ & LORA) -->
+        <section id="tab_studio" class="h-full hidden overflow-y-auto p-3.5 lg:p-6 w-full">
+            <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 pb-8">
                 <!-- Karakter Oluşturucu -->
-                <div class="glass rounded-3xl p-6 space-y-3.5">
+                <div class="glass rounded-3xl p-5 space-y-3.5">
                     <div class="flex items-center justify-between">
-                        <h2 class="font-bold text-base text-purple-300">🎭 Yeni RP Karakteri Oluştur</h2>
+                        <h2 class="font-bold text-sm lg:text-base text-purple-300">🎭 Yeni RP Karakteri Oluştur</h2>
                         <span id="charQuotaBadge" class="text-[11px] px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-300">Kota: -</span>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-2 gap-2.5">
                         <input id="cName" type="text" placeholder="Karakter Adı (Örn: Aria)" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs">
                         <input id="cTitle" type="text" placeholder="Unvanı (Örn: Siber Hacker)" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs">
                     </div>
-                    <div class="grid grid-cols-2 gap-3 items-center">
-                        <input id="cAvatarUrl" type="text" placeholder="Avatar URL (veya yanda seç)" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs">
+                    <div class="grid grid-cols-2 gap-2.5 items-center">
+                        <input id="cAvatarUrl" type="text" placeholder="Avatar URL (veya dosya seç)" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs">
                         <input id="cAvatarFile" type="file" accept="image/*" onchange="encodeAvatarFile(this)" class="text-[10px] text-slate-400 w-full">
                     </div>
+
+                    <!-- KARAKTERE ÖZEL 1 REFERANS GÖRSEL (RP IMG2IMG İÇİN) -->
+                    <div class="p-3 rounded-2xl bg-purple-950/20 border border-purple-500/30 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-bold text-purple-300">📸 Karakter Referans Görseli (RP img2img İçin 1 Adet)</span>
+                            <span id="charRefStatus" class="text-[10px] text-slate-400">Seçilmedi</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <input id="cRefPrompt" type="text" placeholder="Referans dış görünüş tarifi (AI ile üretmek için)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs">
+                            <button type="button" onclick="generateCharReferenceImage()" id="btnGenCharRef" class="px-3 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-[11px] shrink-0">✨ AI İle Üret</button>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 pt-1">
+                            <input id="cRefFile" type="file" accept="image/*" onchange="encodeCharRefFile(this)" class="text-[10px] text-slate-400 flex-1">
+                            <img id="cRefPreview" src="" class="hidden w-12 h-12 rounded-xl object-cover border border-pink-500/50">
+                        </div>
+                    </div>
+
                     <textarea id="cPersonality" rows="2" placeholder="Kişilik Özellikleri (Örn: Alaycı, zeki, sadık...)" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs"></textarea>
                     <textarea id="cScenario" rows="2" placeholder="Senaryo / Başlangıç Ortamı" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs"></textarea>
                     <textarea id="cFirstMsg" rows="3" placeholder="İlk Mesaj (*aksiyon* ve &quot;konuşma&quot;)" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs"></textarea>
                     <textarea id="cLorebook" rows="2" placeholder="Lorebook / Dünya Bilgisi & Anahtar Kelimeler" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs"></textarea>
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between gap-2">
                         <select id="cTrainedModel" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs w-1/2"></select>
                         <label class="flex items-center gap-2 text-[11px] text-slate-300">
                             <input id="cPublic" type="checkbox" checked> Topluluk Vitrinine Ekle
@@ -298,14 +509,14 @@
                 </div>
 
                 <!-- Özel Model Eğitimi -->
-                <div class="glass rounded-3xl p-6 space-y-4">
+                <div class="glass rounded-3xl p-5 space-y-4 h-fit">
                     <div class="flex items-center justify-between">
-                        <h2 class="font-bold text-base text-emerald-300">🧬 Özel Model Eğitimi (LoRA / Hafıza)</h2>
+                        <h2 class="font-bold text-sm lg:text-base text-emerald-300">🧬 Özel Model Eğitimi (LoRA / Hafıza)</h2>
                         <span id="trainQuotaBadge" class="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">Kota: -</span>
                     </div>
                     <p class="text-xs text-slate-400">Yetkili hesaplar kendi karakterlerine özel hafıza, görsel veya video modeli eğitebilir.</p>
                     <input id="tName" type="text" placeholder="Eğitilecek Model Adı (Örn: Seraphina v2 LoRA)" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs">
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-2 gap-2.5">
                         <select id="tType" class="bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs">
                             <option value="memory_pack">🧠 Karakter Hafıza & Diyalog</option>
                             <option value="image_lora">🎨 Görsel Üretim LoRA Modeli</option>
@@ -318,26 +529,56 @@
 
                     <div class="pt-3 border-t border-white/10">
                         <h3 class="text-xs font-bold text-slate-400 mb-2">Eğitilmiş Modellerim</h3>
-                        <div id="trainedModelsList" class="space-y-1.5 max-h-40 overflow-y-auto"></div>
+                        <div id="trainedModelsList" class="space-y-1.5 max-h-44 overflow-y-auto"></div>
                     </div>
                 </div>
             </div>
         </section>
     </main>
 
+    <!-- ==================== MOBİL ALT NAVİGASYON BAR (Sadece Telefon <lg) ==================== -->
+    <nav class="lg:hidden glass h-16 px-1.5 border-t border-white/10 grid grid-cols-7 items-center shrink-0 z-30">
+        <button onclick="switchTab('rp')" id="mTabBtn_rp" class="flex flex-col items-center justify-center py-1 rounded-xl text-purple-400 font-bold">
+            <span class="text-base">🎭</span>
+            <span class="text-[9px] mt-0.5">RP</span>
+        </button>
+        <button onclick="switchTab('assistant')" id="mTabBtn_assistant" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400">
+            <span class="text-base">💬</span>
+            <span class="text-[9px] mt-0.5">Asistan</span>
+        </button>
+        <button onclick="switchTab('global')" id="mTabBtn_global" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400">
+            <span class="text-base">🌐</span>
+            <span class="text-[9px] mt-0.5">Ortak</span>
+        </button>
+        <button onclick="switchTab('dm')" id="mTabBtn_dm" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400">
+            <span class="text-base">💌</span>
+            <span class="text-[9px] mt-0.5">DM</span>
+        </button>
+        <button onclick="switchTab('image')" id="mTabBtn_image" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400">
+            <span class="text-base">🎨</span>
+            <span class="text-[9px] mt-0.5">Görsel</span>
+        </button>
+        <button onclick="switchTab('video')" id="mTabBtn_video" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400">
+            <span class="text-base">🎬</span>
+            <span class="text-[9px] mt-0.5">Video</span>
+        </button>
+        <button onclick="switchTab('studio')" id="mTabBtn_studio" class="flex flex-col items-center justify-center py-1 rounded-xl text-slate-400">
+            <span class="text-base">🧬</span>
+            <span class="text-[9px] mt-0.5">Stüdyo</span>
+        </button>
+    </nav>
+
     <!-- LIGHTBOX (Tam Ekran Medya) MODALI -->
-    <div id="lightbox" class="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md hidden flex-col items-center justify-center p-4">
-        <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white bg-slate-800/80 hover:bg-rose-600 rounded-full w-10 h-10 flex items-center justify-center transition shadow-lg text-xl z-50">✕</button>
-        <div id="lightboxContent" class="w-full max-w-5xl h-auto max-h-[80vh] flex items-center justify-center overflow-hidden">
-            <!-- Medya içeriği JS ile buraya basılır -->
-        </div>
-        <div class="mt-6 flex gap-4 shrink-0">
-            <a id="lightboxDownloadBtn" href="#" download class="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 font-bold text-sm text-white shadow-lg shadow-purple-600/30">⬇ Dosyayı İndir</a>
+    <div id="lightbox" class="fixed inset-0 z-[100] bg-black/95 hidden flex-col items-center justify-center p-4">
+        <button onclick="closeLightbox()" class="absolute top-5 right-5 text-white bg-slate-800 hover:bg-rose-600 rounded-full w-10 h-10 flex items-center justify-center text-lg z-50">✕</button>
+        <div id="lightboxContent" class="w-full max-w-5xl max-h-[78vh] flex items-center justify-center overflow-hidden"></div>
+        <div class="mt-5 flex gap-3 shrink-0">
+            <a id="lightboxDownloadBtn" href="#" download class="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 font-bold text-xs text-white shadow-lg">⬇ Dosyayı İndir</a>
         </div>
     </div>
 
     <!-- PERSONA DÜZENLEME MODALI -->
-    <div id="personaModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div id="personaModal" class="fixed inset-0 z-50 bg-black/80 hidden items-center justify-center p-4">
         <div class="glass max-w-md w-full rounded-3xl p-6 space-y-4">
             <h3 class="font-bold text-base">👤 RP Kimliğin (Persona)</h3>
             <p class="text-xs text-slate-400">Rol yaparken karakterlerin seni nasıl tanımasını istiyorsun?</p>
@@ -351,8 +592,18 @@
     </div>
 
     <script>
+        // iOS Çift Dokunma ve Pinch Zoom Kesin Engelleme
+        document.addEventListener('gesturestart', e => e.preventDefault());
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', e => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 280) e.preventDefault();
+            lastTouchEnd = now;
+        }, { passive: false });
+
         let STATE = {
             user: null,
+            users_directory: [],
             settings: {},
             models: [],
             characters: [],
@@ -362,10 +613,16 @@
             media: [],
             activeRpChat: null,
             activeAstChat: null,
+            activeDmUser: null,
+            dmAttachmentBase64: "",
             avatarBase64: "",
+            charRefBase64: "",
+            imgSourceMedia: "",
+            vidSourceMedia: "",
             activeTab: "rp"
         };
         let globalPollInterval = null;
+        let dmPollInterval = null;
 
         function formatRpText(text) {
             if (!text) return "";
@@ -373,6 +630,29 @@
             safe = safe.replace(/\*([^*]+)\*/g, '<span class="rp-action">*$1*</span>');
             safe = safe.replace(/"([^"]+)"/g, '<span class="rp-quote">"$1"</span>');
             return safe.replace(/\n/g, "<br>");
+        }
+
+        // --- MOBİL SÜRGÜLÜ ÇEKMECE KONTROLÜ ---
+        function toggleMobileDrawer() {
+            const tab = STATE.activeTab;
+            const panelId = tab === "rp" ? "rpSidebarPanel" : (tab === "assistant" ? "astSidebarPanel" : (tab === "dm" ? "dmSidebarPanel" : null));
+            if (!panelId) return;
+            const panel = document.getElementById(panelId);
+            const backdrop = document.getElementById("mobileDrawerBackdrop");
+            const isOpen = !panel.classList.contains("-translate-x-full");
+            if (isOpen) closeMobileDrawer();
+            else {
+                panel.classList.remove("-translate-x-full");
+                backdrop.classList.remove("hidden");
+            }
+        }
+
+        function closeMobileDrawer() {
+            ["rpSidebarPanel", "astSidebarPanel", "dmSidebarPanel"].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add("-translate-x-full");
+            });
+            document.getElementById("mobileDrawerBackdrop").classList.add("hidden");
         }
 
         async function loadInit() {
@@ -395,6 +675,7 @@
             document.getElementById("authScreen").classList.add("hidden");
 
             STATE.user = data.user;
+            STATE.users_directory = data.users_directory || [];
             STATE.models = data.models || [];
             STATE.characters = data.characters || [];
             STATE.trained_models = data.trained_models || [];
@@ -408,6 +689,7 @@
             renderAssistantSidebar();
             renderStudio();
             renderMediaGalleries();
+            loadDmContacts();
 
             if (!STATE.activeRpChat && STATE.chats.length > 0) selectRpChat(STATE.chats[0].id);
             if (!STATE.activeAstChat && STATE.assistant_chats.length > 0) selectAstChat(STATE.assistant_chats[0].id);
@@ -415,10 +697,11 @@
 
         function renderHeader() {
             document.getElementById("userCredits").innerText = STATE.user.credits;
+            document.getElementById("userCreditsMobile").innerText = STATE.user.credits;
             document.getElementById("userNameBadge").innerText = STATE.user.persona_name || STATE.user.username;
-            const adminBtn = document.getElementById("adminPanelBtn");
-            if (STATE.user.role === "admin") adminBtn.classList.remove("hidden");
-            else adminBtn.classList.add("hidden");
+            const isAdmin = STATE.user.role === "admin";
+            document.getElementById("adminPanelBtn").classList.toggle("hidden", !isAdmin);
+            document.getElementById("adminPanelBtnMobile").classList.toggle("hidden", !isAdmin);
         }
 
         function renderModels() {
@@ -428,7 +711,7 @@
 
             const fill = (elId, list) => {
                 const el = document.getElementById(elId);
-                el.innerHTML = list.map(m => `<option value="${m.id}">${m.name} (-${m.cost}⚡)</option>`).join("");
+                if (el) el.innerHTML = list.map(m => `<option value="${m.id}">${m.name} (-${m.cost}⚡)</option>`).join("");
             };
             fill("rpModelSelect", chatModels);
             fill("astModelSelect", chatModels);
@@ -444,14 +727,14 @@
             document.getElementById("cTrainedModel").innerHTML = `<option value="">-- Eğitilmiş Hafıza Paketi Yok --</option>` + memTrn.map(t => `<option value="${t.id}">${t.name}</option>`).join("");
         }
 
-        // --- RP FONKSİYONLARI ---
+        // --- RP FONKSİYONLARI & SAHNE IMG2IMG ---
         function renderRpSidebar() {
             const myChars = STATE.characters.filter(c => c.creator === STATE.user.username);
             const communityChars = STATE.characters.filter(c => c.is_public && c.creator !== STATE.user.username);
 
             const buildCharList = (chars) => chars.map(c => `
-                <div onclick="startNewRpChat('${c.id}')" class="glass-card p-2.5 rounded-2xl flex items-center gap-3 cursor-pointer hover:border-purple-500/50 transition">
-                    <img src="${c.avatar}" class="w-11 h-11 rounded-xl object-cover shrink-0">
+                <div onclick="startNewRpChat('${c.id}'); closeMobileDrawer();" class="glass-card p-2.5 rounded-2xl flex items-center gap-3 cursor-pointer hover:border-purple-500/50 transition">
+                    <img src="${c.avatar}" class="w-10 h-10 rounded-xl object-cover shrink-0">
                     <div class="min-w-0 flex-1">
                         <h4 class="text-xs font-bold truncate">${c.name}</h4>
                         <p class="text-[10px] text-slate-400 truncate">${c.title || ''} • 👤${c.creator}</p>
@@ -465,7 +748,7 @@
             const chatBox = document.getElementById("rpChatList");
             chatBox.innerHTML = STATE.chats.map(ch => `
                 <div class="flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer ${STATE.activeRpChat && STATE.activeRpChat.id === ch.id ? 'bg-purple-600/25 border border-purple-500/40 text-white' : 'hover:bg-white/5 text-slate-300'}">
-                    <span onclick="selectRpChat('${ch.id}')" class="truncate flex-1">${ch.title}</span>
+                    <span onclick="selectRpChat('${ch.id}'); closeMobileDrawer();" class="truncate flex-1">${ch.title}</span>
                     <button onclick="deleteRpChat('${ch.id}')" class="text-slate-500 hover:text-rose-400 ml-2">✕</button>
                 </div>
             `).join("");
@@ -494,7 +777,7 @@
             document.getElementById("activeCharName").innerText = chat.character_name;
             document.getElementById("activeCharTitle").innerText = char.title || "Aktif Rol Yapma Oturumu";
             document.getElementById("activeCharAvatar").src = chat.character_avatar;
-            document.getElementById("memorySummaryText").innerText = chat.memory_summary || "Henüz özetlenmiş uzun süreli hafıza yok (Mesaj sayısı sınırı aşınca otomatik özetlenir).";
+            document.getElementById("memorySummaryText").innerText = chat.memory_summary || "Henüz özetlenmiş uzun süreli hafıza yok.";
 
             renderRpMessages();
             renderRpSidebar();
@@ -503,23 +786,27 @@
         function renderRpMessages() {
             const box = document.getElementById("rpMessagesBox");
             if (!STATE.activeRpChat) {
-                box.innerHTML = `<div class="text-center text-slate-500 text-sm mt-20">Sol taraftan bir karakter seçerek hikayeyi başlatın.</div>`;
+                box.innerHTML = `<div class="text-center text-slate-500 text-xs mt-20">Menüden bir karakter seçerek hikayeyi başlatın.</div>`;
                 return;
             }
             box.innerHTML = STATE.activeRpChat.messages.map(m => {
                 const isUser = m.role === "user";
                 const swipes = m.swipes || [m.content];
                 const swipeNav = (!isUser && swipes.length > 1) ? `
-                    <div class="inline-flex items-center gap-1.5 bg-slate-900/80 px-2 py-0.5 rounded-lg border border-white/10 text-[11px] text-purple-300">
+                    <div class="inline-flex items-center gap-1.5 bg-slate-900 px-2 py-0.5 rounded-lg border border-white/10 text-[10px] text-purple-300">
                         <button onclick="swipeRpMsg('${m.id}', -1)">◀</button>
                         <span>${(m.active_swipe || 0) + 1}/${swipes.length}</span>
                         <button onclick="swipeRpMsg('${m.id}', 1)">▶</button>
                     </div>
                 ` : "";
 
+                const mediaHtml = m.media_url ? `
+                    <img src="${m.media_url}" onclick="openLightbox('${m.media_url}', 'image', '${m.media_id || ''}')" class="mt-2 rounded-2xl max-h-72 object-cover border border-pink-500/30 cursor-pointer">
+                ` : "";
+
                 return `
                 <div class="flex ${isUser ? 'justify-end' : 'justify-start'}">
-                    <div class="max-w-2xl rounded-2xl p-4 ${isUser ? 'bg-purple-950/40 border border-purple-500/30' : 'glass-card'} space-y-2">
+                    <div class="max-w-2xl rounded-2xl p-3.5 ${isUser ? 'bg-purple-950/50 border border-purple-500/30' : 'glass-card'} space-y-1.5">
                         <div class="flex items-center justify-between gap-4 text-[11px] text-slate-400">
                             <span class="font-bold ${isUser ? 'text-purple-300' : 'text-indigo-300'}">${isUser ? (STATE.user.persona_name || STATE.user.username) : STATE.activeRpChat.character_name}</span>
                             <div class="flex items-center gap-2">
@@ -528,15 +815,48 @@
                                 <button onclick="deleteRpMsg('${m.id}')" class="hover:text-rose-400" title="Sil">🗑️</button>
                             </div>
                         </div>
-                        <div class="text-sm leading-relaxed">${formatRpText(m.content)}</div>
+                        <div class="text-xs lg:text-sm leading-relaxed">${formatRpText(m.content)}</div>
+                        ${mediaHtml}
                     </div>
                 </div>`;
             }).join("");
             box.scrollTop = box.scrollHeight;
         }
 
+        function toggleSceneDrawer() {
+            document.getElementById("rpSceneDrawer").classList.toggle("hidden");
+        }
+
+        async function generateRpSceneImage() {
+            if (!STATE.activeRpChat) return alert("Önce bir RP sohbeti seçin!");
+            const btn = document.getElementById("rpSceneBtn");
+            btn.disabled = true; btn.innerText = "Çiziliyor...";
+
+            const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/scene-image`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    prompt: document.getElementById("rpScenePrompt").value,
+                    strength: document.getElementById("rpSceneStrength").value,
+                    model_id: document.getElementById("imgModelSelect").value
+                })
+            });
+            const data = await res.json();
+            btn.disabled = false; btn.innerText = "✨ Sahne Çiz";
+
+            if (data.error) return alert(data.error);
+            document.getElementById("rpScenePrompt").value = "";
+            if (data.media) {
+                STATE.media.unshift(data.media);
+                renderMediaGalleries();
+            }
+            updateChatInState(data.chat);
+            STATE.user.credits = data.credits;
+            renderHeader();
+        }
+
         async function sendRpMessage() {
-            if (!STATE.activeRpChat) return alert("Önce sol menüden bir karakter seçin!");
+            if (!STATE.activeRpChat) return alert("Önce menüden bir karakter seçin!");
             const input = document.getElementById("rpInput");
             const content = input.value.trim();
             if (!content) return;
@@ -631,7 +951,7 @@
             const box = document.getElementById("astChatList");
             box.innerHTML = STATE.assistant_chats.map(ch => `
                 <div class="flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer ${STATE.activeAstChat && STATE.activeAstChat.id === ch.id ? 'bg-purple-600 text-white' : 'hover:bg-white/5 text-slate-300'}">
-                    <span onclick="selectAstChat('${ch.id}')" class="truncate flex-1">${ch.title}</span>
+                    <span onclick="selectAstChat('${ch.id}'); closeMobileDrawer();" class="truncate flex-1">${ch.title}</span>
                     <button onclick="deleteAstChat('${ch.id}')" class="text-slate-500 hover:text-rose-400 ml-2">✕</button>
                 </div>
             `).join("");
@@ -660,12 +980,12 @@
         function renderAssistantMessages() {
             const box = document.getElementById("astMessagesBox");
             if (!STATE.activeAstChat) {
-                box.innerHTML = `<div class="text-center text-slate-500 text-sm mt-20">Aşağıdan bir soru sorarak yeni sohbet başlatın.</div>`;
+                box.innerHTML = `<div class="text-center text-slate-500 text-xs mt-20">Aşağıdan bir soru sorarak yeni sohbet başlatın.</div>`;
                 return;
             }
             box.innerHTML = STATE.activeAstChat.messages.map(m => `
                 <div class="flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}">
-                    <div class="max-w-2xl rounded-2xl p-4 text-sm ${m.role === 'user' ? 'bg-purple-600 text-white' : 'glass-card text-slate-200'} whitespace-pre-wrap">${m.content}</div>
+                    <div class="max-w-2xl rounded-2xl p-3.5 text-xs lg:text-sm ${m.role === 'user' ? 'bg-purple-600 text-white' : 'glass-card text-slate-200'} whitespace-pre-wrap">${m.content}</div>
                 </div>
             `).join("");
             box.scrollTop = box.scrollHeight;
@@ -701,33 +1021,36 @@
             renderAssistantMessages();
         }
 
-        // --- ORTAK ODA (GLOBAL CHAT) FONKSİYONLARI ---
+        // --- ORTAK ODA (GLOBAL CHAT + MESAJ SİLME) ---
         async function loadGlobalChat() {
             const res = await fetch("/api/global/sync");
             const data = await res.json();
             if (data.messages) {
                 const box = document.getElementById("globalMessagesBox");
-                const wasScrolledToBottom = box.scrollHeight - box.clientHeight <= box.scrollTop + 50;
+                const wasScrolledToBottom = box.scrollHeight - box.clientHeight <= box.scrollTop + 60;
 
                 box.innerHTML = data.messages.map(m => {
                     const isAi = (m.type === "ai_text");
-                    const isMedia = (m.type === "image" || m.type === "video");
+                    const canDelete = STATE.user && (m.user === STATE.user.username || STATE.user.role === "admin");
                     let contentHtml = "";
 
                     if (m.type === "image") {
-                        contentHtml = `<img src="${m.file_path}" onclick="openLightbox('${m.file_path}', 'image', '${m.id}')" class="w-64 h-64 object-cover rounded-xl mt-2 cursor-zoom-in border border-white/10 hover:opacity-90">`;
+                        contentHtml = `<img src="${m.file_path}" onclick="openLightbox('${m.file_path}', 'image', '${m.id}')" class="w-56 h-56 object-cover rounded-xl mt-2 cursor-pointer border border-white/10">`;
                     } else if (m.type === "video") {
-                        contentHtml = `<video src="${m.file_path}" class="w-64 h-auto rounded-xl mt-2 border border-white/10" controls></video>
-                                       <button onclick="openLightbox('${m.file_path}', 'video', '${m.id}')" class="mt-2 text-[10px] bg-slate-800 px-2 py-1 rounded">Tam Ekran Yap</button>`;
+                        contentHtml = `<video src="${m.file_path}" class="w-60 h-auto rounded-xl mt-2 border border-white/10" controls></video>
+                                       <button onclick="openLightbox('${m.file_path}', 'video', '${m.id}')" class="mt-1.5 text-[10px] bg-slate-800 px-2.5 py-1 rounded-lg">Tam Ekran</button>`;
                     } else {
-                        contentHtml = `<div class="whitespace-pre-wrap text-sm">${m.content}</div>`;
+                        contentHtml = `<div class="whitespace-pre-wrap text-xs lg:text-sm">${m.content}</div>`;
                     }
 
                     return `
-                    <div class="flex flex-col mb-4 bg-slate-900/50 p-3.5 rounded-2xl border ${isAi ? 'border-cyan-500/30 ml-4' : 'border-white/5'}">
-                        <div class="flex items-center gap-2 mb-1.5">
-                            <span class="font-bold text-[11px] ${isAi ? 'text-cyan-400' : 'text-purple-300'}">${m.user}</span>
-                            <span class="text-[9px] text-slate-500">${m.timestamp}</span>
+                    <div class="flex flex-col bg-slate-900/70 p-3 rounded-2xl border ${isAi ? 'border-cyan-500/30 ml-4' : 'border-white/5'}">
+                        <div class="flex items-center justify-between mb-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-[11px] ${isAi ? 'text-cyan-400' : 'text-purple-300'}">${m.user}</span>
+                                <span class="text-[9px] text-slate-500">${m.timestamp}</span>
+                            </div>
+                            ${canDelete ? `<button onclick="deleteGlobalMessage('${m.id}')" class="text-[11px] text-slate-500 hover:text-rose-400" title="Mesajı Sil">🗑️</button>` : ''}
                         </div>
                         ${contentHtml}
                     </div>`;
@@ -753,26 +1076,196 @@
             STATE.user.credits = data.credits;
             renderHeader();
             loadGlobalChat();
-            setTimeout(() => {
-                const box = document.getElementById("globalMessagesBox");
-                box.scrollTop = box.scrollHeight;
-            }, 100);
         }
 
-        // --- GÖRSEL & VİDEO ÜRETİM ---
+        async function deleteGlobalMessage(msgId) {
+            const res = await fetch(`/api/global/message/${msgId}`, {method: "DELETE"});
+            const data = await res.json();
+            if (data.error) return alert(data.error);
+            loadGlobalChat();
+        }
+
+        // --- KULLANICILAR ARASI DM & MESAJ SİLME FONKSİYONLARI ---
+        async function loadDmContacts() {
+            const res = await fetch("/api/dm/list");
+            const data = await res.json();
+            const box = document.getElementById("dmContactsList");
+            if (!data.contacts || !data.contacts.length) {
+                box.innerHTML = `<p class="text-xs text-slate-500 italic">Henüz başka kayıtlı kullanıcı yok.</p>`;
+                return;
+            }
+            box.innerHTML = data.contacts.map(u => `
+                <div onclick="selectDmUser('${u.username}'); closeMobileDrawer();" class="p-2.5 rounded-2xl cursor-pointer flex items-center justify-between transition ${STATE.activeDmUser === u.username ? 'bg-emerald-600/25 border border-emerald-500/40 text-white' : 'glass-card hover:border-white/20'}">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-bold text-xs text-emerald-300 truncate">${u.persona_name}</span>
+                            <span class="text-[10px] text-slate-400">@${u.username}</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 truncate mt-0.5">${u.last_message || 'Sohbet başlatmak için dokun'}</p>
+                    </div>
+                    <span class="text-[9px] text-slate-500">${u.last_time || ''}</span>
+                </div>
+            `).join("");
+        }
+
+        function selectDmUser(username) {
+            STATE.activeDmUser = username;
+            document.getElementById("activeDmUserTitle").innerText = `@${username} ile Özel Sohbet`;
+            loadDmContacts();
+            loadDmMessages();
+        }
+
+        function encodeDmAttachment(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                STATE.dmAttachmentBase64 = reader.result;
+                document.getElementById("dmInput").placeholder = "📎 Görsel eklendi! Mesajınızı yazıp gönderin...";
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function loadDmMessages() {
+            if (!STATE.activeDmUser) return;
+            const res = await fetch(`/api/dm/${STATE.activeDmUser}`);
+            const data = await res.json();
+            const box = document.getElementById("dmMessagesBox");
+            if (!data.messages || !data.messages.length) {
+                box.innerHTML = `<div class="text-center text-slate-500 text-xs mt-16">@${STATE.activeDmUser} ile henüz mesajınız yok. İlk mesajı gönderin!</div>`;
+                return;
+            }
+            box.innerHTML = data.messages.map(m => {
+                const isMine = m.sender === STATE.user.username;
+                const canDelete = isMine || STATE.user.role === "admin";
+                const mediaHtml = m.media_url ? `<img src="${m.media_url}" onclick="openLightbox('${m.media_url}', 'image', '')" class="mt-2 rounded-xl max-h-56 object-cover cursor-pointer border border-white/10">` : "";
+                return `
+                <div class="flex ${isMine ? 'justify-end' : 'justify-start'}">
+                    <div class="max-w-lg rounded-2xl p-3 ${isMine ? 'bg-emerald-950/60 border border-emerald-500/30' : 'glass-card'} space-y-1">
+                        <div class="flex items-center justify-between gap-4 text-[10px] text-slate-400">
+                            <span class="font-bold ${isMine ? 'text-emerald-300' : 'text-purple-300'}">@${m.sender}</span>
+                            <div class="flex items-center gap-2">
+                                <span>${m.timestamp}</span>
+                                ${canDelete ? `<button onclick="deleteDmMessage('${m.id}')" class="hover:text-rose-400" title="Mesajı Sil">🗑️</button>` : ''}
+                            </div>
+                        </div>
+                        <div class="text-xs lg:text-sm whitespace-pre-wrap">${m.content}</div>
+                        ${mediaHtml}
+                    </div>
+                </div>`;
+            }).join("");
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function sendDmMessage() {
+            if (!STATE.activeDmUser) return alert("Önce sol listeden mesaj göndereceğiniz kullanıcıyı seçin!");
+            const input = document.getElementById("dmInput");
+            const content = input.value.trim();
+            if (!content && !STATE.dmAttachmentBase64) return;
+
+            input.value = "";
+            input.placeholder = "Özel mesajınızı yazın...";
+            const media_data = STATE.dmAttachmentBase64;
+            STATE.dmAttachmentBase64 = "";
+
+            const res = await fetch(`/api/dm/${STATE.activeDmUser}/send`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({content, media_data})
+            });
+            const data = await res.json();
+            if (data.error) return alert(data.error);
+            loadDmMessages();
+            loadDmContacts();
+        }
+
+        async function deleteDmMessage(msgId) {
+            if (!STATE.activeDmUser) return;
+            const res = await fetch(`/api/dm/${STATE.activeDmUser}/message/${msgId}`, {method: "DELETE"});
+            const data = await res.json();
+            if (data.error) return alert(data.error);
+            loadDmMessages();
+            loadDmContacts();
+        }
+
+        // --- DOSYA YÜKLEME & IMG2IMG / IMG2VID / VID2VID FONKSİYONLARI ---
+        function handleSourceFileUpload(input, targetType) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                setSourceMediaForStudio(targetType, reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setSourceMediaForStudio(targetType, mediaUrlOrData) {
+            if (targetType === "image") {
+                STATE.imgSourceMedia = mediaUrlOrData;
+                document.getElementById("imgSourcePreview").src = mediaUrlOrData;
+                document.getElementById("imgSourcePreviewWrap").classList.remove("hidden");
+                document.getElementById("imgSourcePreviewWrap").classList.add("flex");
+                document.getElementById("clearImgSourceBtn").classList.remove("hidden");
+                document.getElementById("imgModeBadge").innerText = "Image-to-Image";
+            } else {
+                STATE.vidSourceMedia = mediaUrlOrData;
+                const isVid = mediaUrlOrData.endsWith(".mp4") || mediaUrlOrData.startsWith("data:video");
+                document.getElementById("vidSourceThumbBox").innerHTML = isVid
+                    ? `<span class="text-[10px] font-bold text-cyan-300">VİDEO</span>`
+                    : `<img src="${mediaUrlOrData}" class="w-full h-full object-cover">`;
+                document.getElementById("vidSourcePreviewWrap").classList.remove("hidden");
+                document.getElementById("vidSourcePreviewWrap").classList.add("flex");
+                document.getElementById("clearVidSourceBtn").classList.remove("hidden");
+                document.getElementById("vidModeBadge").innerText = isVid ? "Video-to-Video" : "Image-to-Video";
+            }
+        }
+
+        function clearSourceMedia(targetType) {
+            if (targetType === "image") {
+                STATE.imgSourceMedia = "";
+                document.getElementById("imgSourceFile").value = "";
+                document.getElementById("imgSourcePreviewWrap").classList.add("hidden");
+                document.getElementById("imgSourcePreviewWrap").classList.remove("flex");
+                document.getElementById("clearImgSourceBtn").classList.add("hidden");
+                document.getElementById("imgModeBadge").innerText = "Text-to-Image";
+            } else {
+                STATE.vidSourceMedia = "";
+                document.getElementById("vidSourceFile").value = "";
+                document.getElementById("vidSourcePreviewWrap").classList.add("hidden");
+                document.getElementById("vidSourcePreviewWrap").classList.remove("flex");
+                document.getElementById("clearVidSourceBtn").classList.add("hidden");
+                document.getElementById("vidModeBadge").innerText = "Text-to-Video";
+            }
+        }
+
+        function sendGalleryMediaToStudio(fileUrl, targetStudio, promptText) {
+            switchTab(targetStudio);
+            setSourceMediaForStudio(targetStudio, fileUrl);
+            if (promptText) {
+                document.getElementById(targetStudio === "image" ? "imgPrompt" : "vidPrompt").value = promptText;
+            }
+        }
+
         async function generateMedia(type) {
             const btn = document.getElementById(type === "image" ? "btnGenImg" : "btnGenVid");
             const originalText = btn.innerText;
             btn.disabled = true; btn.innerText = "Üretiliyor, Lütfen Bekleyin...";
 
+            const sourceMedia = type === "image" ? STATE.imgSourceMedia : STATE.vidSourceMedia;
+            const strength = document.getElementById(type === "image" ? "imgStrength" : "vidStrength").value;
+            let mode = type === "image" ? (sourceMedia ? "img2img" : "txt2img") : (sourceMedia ? (sourceMedia.includes("mp4") || sourceMedia.startsWith("data:video") ? "vid2vid" : "img2vid") : "txt2vid");
+
             const payload = {
                 type,
+                mode,
                 prompt: document.getElementById(type === "image" ? "imgPrompt" : "vidPrompt").value,
                 negative_prompt: type === "image" ? document.getElementById("imgNegPrompt").value : "",
                 aspect_ratio: type === "image" ? document.getElementById("imgRatio").value : "16:9",
                 resolution: type === "video" ? document.getElementById("vidResolution").value : "720p",
                 model_id: document.getElementById(type === "image" ? "imgModelSelect" : "vidModelSelect").value,
-                trained_id: document.getElementById(type === "image" ? "imgTrainedSelect" : "vidTrainedSelect").value
+                trained_id: document.getElementById(type === "image" ? "imgTrainedSelect" : "vidTrainedSelect").value,
+                source_media: sourceMedia,
+                strength: parseFloat(strength || 0.65)
             };
 
             const res = await fetch("/api/media/generate", {
@@ -795,26 +1288,36 @@
             const vids = STATE.media.filter(m => m.type === "video");
 
             document.getElementById("imageGallery").innerHTML = imgs.map(m => `
-                <div class="glass-card rounded-2xl overflow-hidden flex flex-col group">
-                    <div class="relative w-full h-56 cursor-pointer" onclick="openLightbox('${m.preview_url}', 'image', '${m.id}')">
-                        <img src="${m.preview_url}" class="w-full h-full object-cover bg-slate-950 transition group-hover:scale-105">
-                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                            <span class="text-white font-bold tracking-widest text-xs uppercase">Büyüt</span>
-                        </div>
+                <div class="glass-card rounded-2xl overflow-hidden flex flex-col">
+                    <div class="relative w-full h-52 cursor-pointer" onclick="openLightbox('${m.preview_url}', 'image', '${m.id}')">
+                        <img src="${m.preview_url}" loading="lazy" class="w-full h-full object-cover bg-slate-950">
+                        <span class="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-[10px] text-pink-300 font-bold">${m.mode || 'img'}</span>
                     </div>
-                    <div class="p-3 flex items-center justify-between gap-2">
+                    <div class="p-3 space-y-2">
                         <p class="text-xs text-slate-300 truncate">${m.prompt}</p>
-                        <a href="/api/media/download/${m.id}" class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shrink-0">⬇</a>
+                        <div class="flex items-center justify-between gap-1.5">
+                            <div class="flex gap-1">
+                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}', 'image', '')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-pink-600/30 border border-white/10 text-[10px] text-pink-300 font-semibold">✏️ img2img</button>
+                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}', 'video', '')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600/30 border border-white/10 text-[10px] text-indigo-300 font-semibold">🎬 img2vid</button>
+                            </div>
+                            <a href="/api/media/download/${m.id}" class="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold">⬇</a>
+                        </div>
                     </div>
                 </div>
             `).join("") || `<p class="text-xs text-slate-500">Kayıtlı görsel yok.</p>`;
 
             document.getElementById("videoGallery").innerHTML = vids.map(m => `
                 <div class="glass-card rounded-2xl overflow-hidden flex flex-col">
-                    <video src="${m.preview_url}" controls class="w-full h-56 object-cover bg-black cursor-pointer" onclick="openLightbox('${m.preview_url}', 'video', '${m.id}')"></video>
-                    <div class="p-3 flex items-center justify-between gap-2">
+                    <video src="${m.preview_url}" controls preload="metadata" class="w-full h-52 object-cover bg-black"></video>
+                    <div class="p-3 space-y-2">
                         <p class="text-xs text-slate-300 truncate">${m.prompt}</p>
-                        <a href="/api/media/download/${m.id}" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shrink-0">⬇</a>
+                        <div class="flex items-center justify-between gap-1.5">
+                            <div class="flex gap-1">
+                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}', 'video', '')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600/30 border border-white/10 text-[10px] text-cyan-300 font-semibold">🔄 vid2vid</button>
+                                <button onclick="openLightbox('${m.preview_url}', 'video', '${m.id}')" class="px-2.5 py-1 rounded-lg bg-slate-800 text-[10px] text-slate-300">🔍 Büyüt</button>
+                            </div>
+                            <a href="/api/media/download/${m.id}" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">⬇</a>
+                        </div>
                     </div>
                 </div>
             `).join("") || `<p class="text-xs text-slate-500">Kayıtlı video yok.</p>`;
@@ -827,10 +1330,10 @@
             const dlBtn = document.getElementById("lightboxDownloadBtn");
             
             content.innerHTML = type === "image" 
-                ? `<img src="${url}" class="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl">`
-                : `<video src="${url}" controls autoplay class="max-w-full max-h-[80vh] rounded-lg shadow-2xl"></video>`;
+                ? `<img src="${url}" class="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl">`
+                : `<video src="${url}" controls autoplay class="max-w-full max-h-[75vh] rounded-xl shadow-2xl"></video>`;
             
-            dlBtn.href = `/api/media/download/${id}`;
+            dlBtn.href = id ? `/api/media/download/${id}` : url;
             modal.classList.remove("hidden");
             modal.classList.add("flex");
         }
@@ -840,10 +1343,10 @@
             const content = document.getElementById("lightboxContent");
             modal.classList.add("hidden");
             modal.classList.remove("flex");
-            content.innerHTML = ""; // Videoyu durdurmak ve RAM boşaltmak için
+            content.innerHTML = "";
         }
 
-        // --- STÜDYO: KARAKTER & MODEL EĞİTME ---
+        // --- STÜDYO: KARAKTER + 1 REFERANS GÖRSEL & MODEL EĞİTME ---
         function encodeAvatarFile(input) {
             const file = input.files[0];
             if (!file) return;
@@ -855,14 +1358,63 @@
             reader.readAsDataURL(file);
         }
 
+        function encodeCharRefFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                STATE.charRefBase64 = reader.result;
+                const prev = document.getElementById("cRefPreview");
+                prev.src = reader.result;
+                prev.classList.remove("hidden");
+                document.getElementById("charRefStatus").innerText = "Dosyadan Hazır ✓";
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function generateCharReferenceImage() {
+            const promptVal = document.getElementById("cRefPrompt").value.trim() || document.getElementById("cPersonality").value.trim();
+            if (!promptVal) return alert("Lütfen karakterin dış görünüşünü tarif eden kısa bir referans promptu yazın!");
+            const btn = document.getElementById("btnGenCharRef");
+            btn.disabled = true; btn.innerText = "Üretiliyor...";
+
+            const res = await fetch("/api/media/generate", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    type: "image",
+                    mode: "char_ref",
+                    prompt: `character reference portrait, consistent face, ${promptVal}`,
+                    aspect_ratio: "1:1",
+                    model_id: document.getElementById("imgModelSelect").value
+                })
+            });
+            const data = await res.json();
+            btn.disabled = false; btn.innerText = "✨ AI İle Üret";
+            if (data.error) return alert(data.error);
+
+            STATE.charRefBase64 = data.media.preview_url;
+            if (!STATE.avatarBase64 && !document.getElementById("cAvatarUrl").value.trim()) {
+                document.getElementById("cAvatarUrl").value = data.media.preview_url;
+            }
+            const prev = document.getElementById("cRefPreview");
+            prev.src = data.media.preview_url;
+            prev.classList.remove("hidden");
+            document.getElementById("charRefStatus").innerText = "AI Referans Hazır ✓";
+            STATE.media.unshift(data.media);
+            STATE.user.credits = data.credits;
+            renderHeader();
+            renderMediaGalleries();
+        }
+
         function renderStudio() {
             const myChars = STATE.characters.filter(c => c.creator === STATE.user.username).length;
             const myTrn = STATE.trained_models.filter(t => t.creator === STATE.user.username).length;
-            document.getElementById("charQuotaBadge").innerText = `Kullanılan: ${myChars} / ${STATE.user.char_limit}`;
-            document.getElementById("trainQuotaBadge").innerText = `Kullanılan: ${myTrn} / ${STATE.user.train_limit}`;
+            document.getElementById("charQuotaBadge").innerText = `Kota: ${myChars} / ${STATE.user.char_limit}`;
+            document.getElementById("trainQuotaBadge").innerText = `Kota: ${myTrn} / ${STATE.user.train_limit}`;
 
             document.getElementById("trainedModelsList").innerHTML = STATE.trained_models.map(t => `
-                <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/90 border border-white/5 text-xs">
+                <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900 border border-white/5 text-xs">
                     <div>
                         <span class="font-bold text-emerald-300">${t.name}</span>
                         <span class="text-slate-400 ml-2">(${t.type})</span>
@@ -873,13 +1425,17 @@
         }
 
         async function createCharacter() {
-            const avatar = STATE.avatarBase64 || document.getElementById("cAvatarUrl").value.trim();
+            const avatarUrlVal = document.getElementById("cAvatarUrl").value.trim();
+            const avatar = STATE.avatarBase64 || (avatarUrlVal !== "[Dosyadan Seçildi]" ? avatarUrlVal : "");
+            const reference_image = STATE.charRefBase64 || avatar;
+
             const res = await fetch("/api/characters", {
                 method: "POST", headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
                     name: document.getElementById("cName").value,
                     title: document.getElementById("cTitle").value,
                     avatar,
+                    reference_image,
                     personality: document.getElementById("cPersonality").value,
                     scenario: document.getElementById("cScenario").value,
                     first_message: document.getElementById("cFirstMsg").value,
@@ -891,6 +1447,9 @@
             const data = await res.json();
             if (data.error) return alert(data.error);
             STATE.avatarBase64 = "";
+            STATE.charRefBase64 = "";
+            document.getElementById("cRefPreview").classList.add("hidden");
+            document.getElementById("charRefStatus").innerText = "Seçilmedi";
             await loadInit();
             switchTab("rp");
         }
@@ -916,38 +1475,62 @@
             await loadInit();
         }
 
-        // --- AUTH & PERSONA & SEKMELER ---
+        // --- SEKMELER (PC + MOBİL AYRI AKTİVASYON) ---
         function switchTab(tab) {
             STATE.activeTab = tab;
-            ["rp", "assistant", "global", "image", "video", "studio"].forEach(t => {
+            closeMobileDrawer();
+
+            const titles = {
+                rp: "🎭 AI Roleplay",
+                assistant: "💬 AI Asistan",
+                global: "🌐 Ortak Oda",
+                dm: "💌 Özel Mesajlar",
+                image: "🎨 Görsel Stüdyo",
+                video: "🎬 Video Stüdyo",
+                studio: "🧬 Karakter & LoRA"
+            };
+            document.getElementById("mobileHeaderTitle").innerText = titles[tab] || "NEXUS AI";
+
+            // Mobilde sol üst çekmece butonu sadece yan listesi olan sekmelerde görünsün
+            const drawerBtn = document.getElementById("mobileDrawerBtn");
+            if (["rp", "assistant", "dm"].includes(tab)) drawerBtn.classList.remove("hidden");
+            else drawerBtn.classList.add("hidden");
+
+            ["rp", "assistant", "global", "dm", "image", "video", "studio"].forEach(t => {
                 const sec = document.getElementById("tab_" + t);
-                const btn = document.getElementById("tabBtn_" + t);
+                const pcBtn = document.getElementById("tabBtn_" + t);
+                const mobBtn = document.getElementById("mTabBtn_" + t);
+
                 if (sec) {
                     sec.classList.add("hidden");
                     sec.classList.remove("flex");
                 }
-                if (btn) btn.className = "tab-btn shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition text-slate-400 hover:text-white";
+                if (pcBtn) pcBtn.className = "tab-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition text-slate-400 hover:text-white hover:bg-white/5";
+                if (mobBtn) mobBtn.className = "flex flex-col items-center justify-center py-1 rounded-xl text-slate-400";
             });
 
             const target = document.getElementById("tab_" + tab);
             if (target) {
                 target.classList.remove("hidden");
-                if (tab === "rp" || tab === "assistant" || tab === "global") target.classList.add("flex");
+                if (["rp", "assistant", "global", "dm"].includes(tab)) target.classList.add("flex");
             }
-            
-            const activeBtn = document.getElementById("tabBtn_" + tab);
-            if(activeBtn) {
-                if(tab==='rp') activeBtn.classList.add("bg-purple-600", "text-white");
-                else if(tab==='global') activeBtn.classList.add("bg-cyan-600", "text-white");
-                else activeBtn.classList.add("bg-indigo-600", "text-white");
-                activeBtn.classList.remove("text-slate-400");
-            }
+
+            const activePc = document.getElementById("tabBtn_" + tab);
+            if (activePc) activePc.className = "tab-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition bg-purple-600 text-white shadow-lg shadow-purple-600/20";
+
+            const activeMob = document.getElementById("mTabBtn_" + tab);
+            if (activeMob) activeMob.className = "flex flex-col items-center justify-center py-1 rounded-xl text-purple-400 font-bold bg-purple-500/10";
+
+            if (globalPollInterval) { clearInterval(globalPollInterval); globalPollInterval = null; }
+            if (dmPollInterval) { clearInterval(dmPollInterval); dmPollInterval = null; }
 
             if (tab === 'global') {
                 loadGlobalChat();
-                if (!globalPollInterval) globalPollInterval = setInterval(loadGlobalChat, 3000);
-            } else {
-                if (globalPollInterval) { clearInterval(globalPollInterval); globalPollInterval = null; }
+                globalPollInterval = setInterval(loadGlobalChat, 3500);
+            } else if (tab === 'dm') {
+                loadDmContacts();
+                loadDmMessages();
+                dmPollInterval = setInterval(loadDmMessages, 3500);
             }
         }
 
