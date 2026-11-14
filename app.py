@@ -91,11 +91,29 @@ def get_default_db():
                 "active": True
             },
             {
+                "id": "mdl_lustify_uncensored",
+                "name": "Lustify SDXL (Tam Sansürsüz)",
+                "api_model_id": "lustify-sdxl",
+                "type": "image",
+                "cost": 10,
+                "endpoint_override": "",
+                "active": True
+            },
+            {
                 "id": "mdl_flux_img",
-                "name": "Venice Flux / XL Image",
+                "name": "Venice Fluently XL Image",
                 "api_model_id": "fluently-xl",
                 "type": "image",
                 "cost": 10,
+                "endpoint_override": "",
+                "active": True
+            },
+            {
+                "id": "mdl_qwen_edit_uncensored",
+                "name": "Qwen Edit Uncensored (Sansürsüz img2img)",
+                "api_model_id": "qwen-edit-uncensored",
+                "type": "image",
+                "cost": 15,
                 "endpoint_override": "",
                 "active": True
             },
@@ -193,6 +211,26 @@ def ensure_db_compatibility(loaded):
             m["endpoint_override"] = ""
 
     existing_model_ids = [m["api_model_id"] for m in loaded.get("models", [])]
+    if "lustify-sdxl" not in existing_model_ids:
+        loaded.setdefault("models", []).insert(2, {
+            "id": "mdl_lustify_uncensored",
+            "name": "Lustify SDXL (Tam Sansürsüz)",
+            "api_model_id": "lustify-sdxl",
+            "type": "image",
+            "cost": 10,
+            "endpoint_override": "",
+            "active": True
+        })
+    if "qwen-edit-uncensored" not in existing_model_ids:
+        loaded.setdefault("models", []).append({
+            "id": "mdl_qwen_edit_uncensored",
+            "name": "Qwen Edit Uncensored (Sansürsüz img2img)",
+            "api_model_id": "qwen-edit-uncensored",
+            "type": "image",
+            "cost": 15,
+            "endpoint_override": "",
+            "active": True
+        })
     if "qwen-image-2-1-turbo-edit" not in existing_model_ids:
         loaded.setdefault("models", []).append({
             "id": "mdl_qwen_edit",
@@ -440,7 +478,26 @@ def compress_chat_memory_if_needed(chat, force=False):
         return False
 
 
-# --- AKILLI & SIFIR HATALI VENICE AI GÖRSEL / VİDEO MOTORU ---
+# --- AKILLI, SANSÜRSÜZ (ANTI-BLUR) & SIFIR HATALI VENICE AI GÖRSEL / VİDEO MOTORU ---
+
+def is_response_blurred(resp):
+    """Venice AI yanıtında bulanıklaştırma (content violation / blur) olup olmadığını tespit eder."""
+    for h_key, h_val in resp.headers.items():
+        kl = h_key.lower()
+        vl = str(h_val).lower().strip()
+        if ("content-violation" in kl or "is-blurred" in kl or "blurred" in kl) and vl in ["true", "1", "yes"]:
+            return True
+    ctype = (resp.headers.get("Content-Type") or "").lower()
+    if "application/json" in ctype:
+        try:
+            rj = resp.json()
+            if isinstance(rj, dict):
+                if rj.get("is_blurred") is True or rj.get("content_violation") is True:
+                    return True
+        except Exception:
+            pass
+    return False
+
 
 def extract_image_from_response(resp):
     """Venice AI'dan dönen binary görsel veya JSON yanıtını tek formatta (data_url) çıkarır."""
@@ -484,11 +541,15 @@ def extract_image_from_response(resp):
 
 
 def resolve_adaptive_image_models(model_api_id, is_img2img):
-    """Seçilen modeli girdiye göre adaptif eşler ve hata vermemesi için yedek zinciri döndürür."""
+    """Seçilen modeli girdiye göre adaptif eşler ve blur/hata olmaması için sansürsüz yedek zinciri döndürür."""
     mid = (model_api_id or "").strip()
     if is_img2img:
         edit_map = {
-            "qwen-image": "qwen-image-2-1-turbo-edit",
+            "lustify-sdxl": "qwen-edit-uncensored",
+            "fluently-xl": "qwen-edit-uncensored",
+            "venice-sd35": "qwen-edit-uncensored",
+            "qwen-edit-uncensored": "qwen-edit-uncensored",
+            "qwen-image": "qwen-edit-uncensored",
             "qwen-image-2": "qwen-image-2-1-turbo-edit",
             "qwen-image-2-1-turbo": "qwen-image-2-1-turbo-edit",
             "flux-2-max": "flux-2-max-edit",
@@ -498,18 +559,18 @@ def resolve_adaptive_image_models(model_api_id, is_img2img):
             "nano-banana-pro": "nano-banana-pro-edit",
             "gpt-image-1-5": "gpt-image-1-5-edit",
         }
-        primary = edit_map.get(mid, mid if "edit" in mid.lower() else "qwen-image-2-1-turbo-edit")
+        primary = edit_map.get(mid, mid if "edit" in mid.lower() else "qwen-edit-uncensored")
         candidates = [
             primary,
-            "qwen-image-2-1-turbo-edit",
-            "firered-image-edit",
             "qwen-edit-uncensored",
+            "firered-image-edit",
+            "qwen-image-2-1-turbo-edit",
             "flux-2-max-edit"
         ]
     else:
         txt_map = {
-            "qwen-image-2-1-turbo-edit": "qwen-image-2",
-            "qwen-edit-uncensored": "qwen-image-2",
+            "qwen-edit-uncensored": "lustify-sdxl",
+            "qwen-image-2-1-turbo-edit": "fluently-xl",
             "firered-image-edit": "fluently-xl",
             "flux-2-max-edit": "flux-2-max",
             "flux-2-pro-edit": "flux-2-pro",
@@ -522,13 +583,14 @@ def resolve_adaptive_image_models(model_api_id, is_img2img):
         elif mid.endswith("-edit"):
             primary = mid[:-5]
         else:
-            primary = mid or "fluently-xl"
+            primary = mid or "lustify-sdxl"
         candidates = [
             primary,
+            "lustify-sdxl",
             "fluently-xl",
+            "venice-sd35",
             "z-image-turbo",
-            "flux-2-max",
-            "venice-sd35"
+            "flux-2-max"
         ]
 
     seen = set()
@@ -548,6 +610,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     is_img2img = bool(raw_b64)
     candidate_models = resolve_adaptive_image_models(model_api_id, is_img2img)
     last_error = ""
+    fallback_blurred_url = None
 
     # --- DURUM 1: GÖRSEL GİRDİSİ VAR -> IMG2IMG (/api/v1/image/edit) ---
     if is_img2img:
@@ -564,44 +627,53 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
 
         for cand_model in candidate_models:
             for ep in edit_endpoints:
-                # 1) Multipart form-data denemesi (Venice AI native edit formatı)
-                try:
-                    form_data = {
-                        "model": cand_model,
-                        "prompt": final_prompt,
-                        "aspect_ratio": "auto"
-                    }
-                    files_dict = {"image": ("source.png", img_bytes, "image/png")}
-                    r = requests.post(ep, headers=base_auth, data=form_data, files=files_dict, timeout=120)
-                    if r.status_code == 200:
-                        data_url = extract_image_from_response(r)
-                        if data_url:
-                            return data_url, None
-                    last_error = f"Venice Edit API ({r.status_code}): {r.text[:250]}"
-                    if r.status_code == 404:
-                        continue  # Sonraki endpoint'i dene
-                except Exception as e:
-                    last_error = str(e)
+                # 1) Multipart form-data denemesi (safe_mode=false ile, hata verirse safe_mode olmadan)
+                for form_payload in [
+                    {"model": cand_model, "prompt": final_prompt, "aspect_ratio": "auto", "safe_mode": "false"},
+                    {"model": cand_model, "prompt": final_prompt, "aspect_ratio": "auto"}
+                ]:
+                    try:
+                        files_dict = {"image": ("source.png", img_bytes, "image/png")}
+                        r = requests.post(ep, headers=base_auth, data=form_payload, files=files_dict, timeout=120)
+                        if r.status_code == 200:
+                            data_url = extract_image_from_response(r)
+                            if data_url:
+                                if is_response_blurred(r):
+                                    fallback_blurred_url = data_url
+                                    break  # Bu model blur verdi, sıradaki sansürsüz modele geç
+                                return data_url, None
+                        last_error = f"Venice Edit API ({r.status_code}): {r.text[:250]}"
+                        if r.status_code == 404 or "safe_mode" not in r.text.lower():
+                            break
+                    except Exception as e:
+                        last_error = str(e)
+                        break
 
-                # 2) JSON payload denemesi (Base64 data URI formatı)
-                try:
-                    json_headers = dict(base_auth)
-                    json_headers["Content-Type"] = "application/json"
-                    json_payload = {
-                        "model": cand_model,
-                        "prompt": final_prompt,
-                        "image": full_data_url,
-                        "aspect_ratio": "auto"
-                    }
-                    r_json = requests.post(ep, headers=json_headers, json=json_payload, timeout=120)
-                    if r_json.status_code == 200:
-                        data_url = extract_image_from_response(r_json)
-                        if data_url:
-                            return data_url, None
-                    last_error = f"Venice Edit JSON ({r_json.status_code}): {r_json.text[:250]}"
-                except Exception as e:
-                    last_error = str(e)
+                # 2) JSON payload denemesi (safe_mode=False ile)
+                for json_payload in [
+                    {"model": cand_model, "prompt": final_prompt, "image": full_data_url, "aspect_ratio": "auto", "safe_mode": False},
+                    {"model": cand_model, "prompt": final_prompt, "image": full_data_url, "aspect_ratio": "auto"}
+                ]:
+                    try:
+                        json_headers = dict(base_auth)
+                        json_headers["Content-Type"] = "application/json"
+                        r_json = requests.post(ep, headers=json_headers, json=json_payload, timeout=120)
+                        if r_json.status_code == 200:
+                            data_url = extract_image_from_response(r_json)
+                            if data_url:
+                                if is_response_blurred(r_json):
+                                    fallback_blurred_url = data_url
+                                    break
+                                return data_url, None
+                        last_error = f"Venice Edit JSON ({r_json.status_code}): {r_json.text[:250]}"
+                        if "safe_mode" not in r_json.text.lower():
+                            break
+                    except Exception as e:
+                        last_error = str(e)
+                        break
 
+        if fallback_blurred_url:
+            return fallback_blurred_url, None
         return None, last_error or "img2img görseli üretilemedi."
 
     # --- DURUM 2: GÖRSEL GİRDİSİ YOK -> TXT2IMG (/api/v1/image/generate) ---
@@ -619,11 +691,14 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
         if negative_prompt:
             payload["negative_prompt"] = negative_prompt
 
-        for _ in range(3):
+        for _ in range(4):
             r = requests.post(target_endpoint, headers=json_headers, json=payload, timeout=120)
             if r.status_code == 200:
                 data_url = extract_image_from_response(r)
                 if data_url:
+                    if is_response_blurred(r):
+                        fallback_blurred_url = data_url
+                        break  # Blur algılandı, sıradaki sansürsüz modele (lustify-sdxl / fluently-xl) geç
                     return data_url, None
                 last_error = f"Beklenmeyen Görsel API yanıtı: {r.text[:200]}"
                 break
@@ -639,12 +714,16 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
             if "negative_prompt" in err_lower and "negative_prompt" in payload:
                 payload.pop("negative_prompt", None)
                 continue
-            if "hide_watermark" in err_lower or "safe_mode" in err_lower:
+            if "hide_watermark" in err_lower and "hide_watermark" in payload:
                 payload.pop("hide_watermark", None)
+                continue
+            if "safe_mode" in err_lower and "safe_mode" in payload:
                 payload.pop("safe_mode", None)
                 continue
             break  # Model desteklenmiyorsa sıradaki yedek modele geç
 
+    if fallback_blurred_url:
+        return fallback_blurred_url, None
     return None, last_error or "txt2img görseli üretilemedi."
 
 
