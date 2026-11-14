@@ -9,20 +9,34 @@
     <style>
         * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; box-sizing: border-box; }
         html, body {
-            font-family: 'Plus Jakarta Sans', sans-serif; background-color: #050609; color: #f1f5f9;
-            height: 100dvh; width: 100vw; overflow: hidden; overscroll-behavior: none; -webkit-text-size-adjust: 100%; user-select: none;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #050609;
+            color: #f1f5f9;
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+            overscroll-behavior: none;
+            -webkit-text-size-adjust: 100%;
+            user-select: none;
         }
         input, textarea, select { user-select: text; font-size: 16px !important; }
         @media (min-width: 1024px) { input, textarea, select { font-size: 13px !important; } }
-        
-        .glass { background: #0b0d14; border: 1px solid rgba(255, 255, 255, 0.05); }
-        .glass-card { background: #10131e; border: 1px solid rgba(255, 255, 255, 0.04); }
-        
-        @media (min-width: 1024px) {
-            .glass { background: rgba(11, 13, 20, 0.85); backdrop-filter: blur(18px); }
-            .glass-card { background: rgba(16, 19, 30, 0.65); backdrop-filter: blur(12px); }
+
+        .glass { background: rgba(11, 13, 20, 0.92); backdrop-filter: blur(18px); border: 1px solid rgba(255, 255, 255, 0.06); }
+        .glass-card { background: linear-gradient(180deg, rgba(20, 24, 38, 0.85) 0%, rgba(14, 17, 28, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.06); }
+        .chat-canvas {
+            background-color: #080a11;
+            background-image:
+                radial-gradient(circle at 15% 15%, rgba(139, 92, 246, 0.06), transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(79, 70, 229, 0.05), transparent 40%);
         }
-        
+        .input-dock {
+            background: linear-gradient(180deg, rgba(11, 13, 20, 0.88) 0%, rgba(8, 10, 16, 0.98) 100%);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
         .rp-action { color: #c084fc; font-style: italic; }
         .rp-quote { color: #fde047; font-weight: 500; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -35,19 +49,19 @@
 <body class="flex flex-col lg:flex-row selection:bg-purple-600 selection:text-white">
 
     <!-- GİRİŞ EKRANI -->
-    <div id="authScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-[#050609] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-950/20 via-[#050609] to-[#050609] p-4 hidden">
-        <div class="glass w-full max-w-sm rounded-[2rem] p-8 shadow-2xl border border-purple-500/10">
+    <div id="authScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-[#050609] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-950/25 via-[#050609] to-[#050609] p-4 hidden">
+        <div class="glass w-full max-w-sm rounded-[2rem] p-8 shadow-2xl border border-purple-500/15">
             <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 shadow-xl shadow-purple-600/20 mb-4 text-3xl font-extrabold">N</div>
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 shadow-xl shadow-purple-600/25 mb-4 text-3xl font-extrabold">N</div>
                 <h1 id="authSiteTitle" class="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-purple-100 to-indigo-300 bg-clip-text text-transparent">NEXUS AI</h1>
                 <p id="authSiteSubtitle" class="text-[11px] text-slate-400 mt-1.5">Sansürsüz Stüdyo & RP</p>
             </div>
             <div class="space-y-4">
-                <input id="authUser" type="text" placeholder="Kullanıcı Adı" class="w-full px-4 py-3.5 rounded-2xl bg-slate-900 border border-slate-800 focus:border-purple-500 focus:outline-none transition">
-                <input id="authPass" type="password" placeholder="Şifre" class="w-full px-4 py-3.5 rounded-2xl bg-slate-900 border border-slate-800 focus:border-purple-500 focus:outline-none transition">
+                <input id="authUser" type="text" placeholder="Kullanıcı Adı" class="w-full px-4 py-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 focus:border-purple-500 focus:outline-none transition">
+                <input id="authPass" type="password" placeholder="Şifre" class="w-full px-4 py-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 focus:border-purple-500 focus:outline-none transition">
                 <p id="authError" class="text-xs text-rose-400 hidden text-center"></p>
                 <div class="grid grid-cols-2 gap-3 pt-2">
-                    <button onclick="submitAuth('login')" class="py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 font-bold text-sm transition shadow-lg shadow-purple-600/20">Giriş</button>
+                    <button onclick="submitAuth('login')" class="py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 font-bold text-sm transition shadow-lg shadow-purple-600/25">Giriş</button>
                     <button onclick="submitAuth('register')" class="py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 font-bold text-sm transition">Kayıt</button>
                 </div>
             </div>
@@ -58,14 +72,14 @@
     <aside class="hidden lg:flex flex-col w-[260px] glass border-r border-white/5 shrink-0 justify-between p-5 z-30">
         <div class="space-y-7">
             <div class="flex items-center gap-3.5 px-2">
-                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-extrabold text-xl shadow-lg shadow-purple-600/20">N</div>
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-extrabold text-xl shadow-lg shadow-purple-600/25">N</div>
                 <div class="min-w-0">
                     <h1 id="navSiteTitle" class="font-extrabold text-sm tracking-tight truncate">NEXUS AI</h1>
                     <p id="navWelcome" class="text-[10px] text-slate-400 truncate">Stüdyo Aktif</p>
                 </div>
             </div>
 
-            <nav class="space-y-2">
+            <nav class="space-y-1.5">
                 <button onclick="switchTab('rp')" id="tabBtn_rp" class="tab-btn w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-xs font-bold transition bg-purple-600 text-white shadow-lg shadow-purple-600/20">
                     <span class="text-base">🎭</span> <span>AI Roleplay</span>
                 </button>
@@ -97,28 +111,30 @@
                 <span id="userCredits">0</span>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="openPersonaModal()" class="flex-1 px-3 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold border border-white/5 truncate text-left transition">
+                <button onclick="openPersonaModal()" class="flex-1 px-3 py-2.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-xs font-semibold border border-white/5 truncate text-left transition">
                     👤 <span id="userNameBadge">Kullanıcı</span>
                 </button>
                 <a id="adminPanelBtn" href="/admin" class="hidden px-3.5 py-2.5 rounded-2xl bg-rose-600/10 hover:bg-rose-600/20 border border-rose-500/30 text-rose-300 text-xs font-bold transition" title="Admin Paneli">⚙️</a>
-                <button onclick="logout()" class="px-3.5 py-2.5 rounded-2xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 text-xs transition" title="Çıkış">✕</button>
+                <button onclick="logout()" class="px-3.5 py-2.5 rounded-2xl bg-slate-800/90 hover:bg-rose-950 text-slate-400 hover:text-rose-300 text-xs transition" title="Çıkış">✕</button>
             </div>
         </div>
     </aside>
 
     <!-- ==================== MOBİL ÜST BAR (Sadece Telefon <lg) ==================== -->
     <header class="lg:hidden glass h-14 px-3 flex items-center justify-between shrink-0 z-30 border-b border-white/5">
-        <div class="flex items-center gap-2.5">
-            <button id="mobileDrawerBtn" onclick="toggleMobileDrawer()" class="w-9 h-9 rounded-xl bg-slate-800/80 border border-white/5 flex items-center justify-center text-sm font-bold text-white">
+        <div class="flex items-center gap-2.5 min-w-0">
+            <button id="mobileDrawerBtn" onclick="toggleMobileDrawer()" class="w-9 h-9 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-white/10 flex items-center justify-center text-sm font-bold text-white shrink-0 transition">
                 ☰
             </button>
-            <div class="flex items-center gap-2">
-                <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-extrabold text-xs">N</div>
+            <div class="flex items-center gap-2 min-w-0">
+                <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-extrabold text-xs shrink-0 shadow-md shadow-purple-600/20">N</div>
                 <span id="mobileHeaderTitle" class="font-bold text-xs tracking-tight truncate max-w-[140px]">AI Roleplay</span>
             </div>
         </div>
 
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 shrink-0">
+            <button onclick="switchTab('dm')" class="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-[11px]" title="Özel Mesajlar">💌</button>
+            <button onclick="switchTab('studio')" class="w-7 h-7 flex items-center justify-center rounded-lg bg-purple-500/10 border border-purple-500/25 text-purple-300 text-[11px]" title="Karakter & LoRA">🧬</button>
             <div class="px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-bold flex items-center gap-1">
                 <span>⚡</span> <span id="userCreditsMobile">0</span>
             </div>
@@ -130,12 +146,12 @@
     <!-- MOBİL SÜRGÜLÜ ÇEKMECE KARARTMASI -->
     <div id="mobileDrawerBackdrop" onclick="closeMobileDrawer()" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 hidden lg:hidden transition-opacity"></div>
 
-    <!-- ==================== ANA İÇERİK ALANI ==================== -->
-    <main class="flex-1 overflow-hidden relative flex flex-col h-full bg-[#06070c]">
+    <!-- ==================== ANA İÇERİK ALANI (Alt Menü Payı pb-[62px] lg:pb-0 ile Korunur) ==================== -->
+    <main id="mainContentArea" class="flex-1 min-h-0 overflow-hidden relative flex flex-col bg-[#06070c] pb-[62px] lg:pb-0">
 
         <!-- 1. SEKME: AI ROLEPLAY -->
-        <section id="tab_rp" class="h-full flex flex-col lg:flex-row overflow-hidden w-full">
-            <aside id="rpSidebarPanel" class="fixed lg:static inset-y-0 left-0 z-50 w-[280px] lg:w-[320px] glass border-r border-white/5 flex flex-col shrink-0 h-full overflow-y-auto p-4 space-y-5 -translate-x-full lg:translate-x-0 transition-transform duration-300">
+        <section id="tab_rp" class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden w-full">
+            <aside id="rpSidebarPanel" class="fixed lg:static inset-y-0 left-0 z-50 w-[285px] lg:w-[320px] glass border-r border-white/5 flex flex-col shrink-0 h-full overflow-y-auto p-4 space-y-5 -translate-x-full lg:translate-x-0 transition-transform duration-300">
                 <div class="flex items-center justify-between lg:hidden pb-3 border-b border-white/5">
                     <span class="text-xs font-extrabold text-white">🎭 Karakterler & Sohbetler</span>
                     <button onclick="closeMobileDrawer()" class="w-8 h-8 rounded-xl bg-slate-800 text-xs text-white">✕</button>
@@ -143,7 +159,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-2">
                         <h2 class="text-[10px] font-bold uppercase tracking-widest text-purple-400">Senin Karakterlerin</h2>
-                        <button onclick="switchTab('studio'); closeMobileDrawer();" class="text-[10px] text-purple-300 font-bold bg-purple-500/10 px-2 py-1 rounded-md">+ Yeni</button>
+                        <button onclick="switchTab('studio'); closeMobileDrawer();" class="text-[10px] text-purple-300 font-bold bg-purple-500/15 hover:bg-purple-500/25 px-2.5 py-1 rounded-lg transition">+ Yeni</button>
                     </div>
                     <div id="rpCharListMy" class="space-y-1.5"></div>
                 </div>
@@ -157,28 +173,32 @@
                 </div>
             </aside>
 
-            <div class="flex-1 flex flex-col h-full overflow-hidden bg-[#0a0c14] relative">
-                <div class="h-[52px] px-3 lg:px-5 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-900/30 backdrop-blur-md z-10">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <img id="activeCharAvatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100" class="w-9 h-9 rounded-full object-cover border border-purple-500/30 shrink-0">
+            <div class="flex-1 min-h-0 flex flex-col overflow-hidden chat-canvas relative">
+                <!-- Üst Karakter & Model Şeridi -->
+                <div class="h-[54px] px-3 lg:px-5 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-900/45 backdrop-blur-md z-10">
+                    <div onclick="toggleMobileDrawer()" class="flex items-center gap-2.5 min-w-0 cursor-pointer lg:cursor-default">
+                        <div class="relative shrink-0">
+                            <img id="activeCharAvatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100" class="w-9 h-9 rounded-full object-cover border border-purple-500/40 shadow-md">
+                            <span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0b0d14]"></span>
+                        </div>
                         <div class="min-w-0">
                             <h3 id="activeCharName" class="text-xs lg:text-sm font-bold truncate text-white">Karakter Seçin</h3>
-                            <p id="activeCharTitle" class="text-[10px] text-purple-300/70 truncate">Menüden bir karaktere tıklayın</p>
+                            <p id="activeCharTitle" class="text-[10px] text-purple-300/75 truncate">Menüden bir karaktere tıklayın</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">
-                        <select id="rpModelSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-[10px] text-slate-200 max-w-[110px] sm:max-w-[160px] focus:outline-none"></select>
-                        <button onclick="toggleSceneDrawer()" class="px-2.5 py-1.5 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/20 text-pink-400 text-[10px] font-bold transition">
+                        <select id="rpModelSelect" class="bg-slate-900/90 border border-slate-700/80 rounded-xl px-2 py-1.5 text-[10px] text-slate-200 max-w-[105px] sm:max-w-[165px] focus:border-purple-500 focus:outline-none"></select>
+                        <button onclick="toggleSceneDrawer()" class="px-2.5 py-1.5 rounded-xl bg-pink-500/15 hover:bg-pink-500/25 border border-pink-500/25 text-pink-300 text-[10px] font-bold transition">
                             📸 <span class="hidden sm:inline ml-1">Sahne</span>
                         </button>
-                        <button onclick="toggleMemoryDrawer()" class="px-2.5 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 text-[10px] font-bold transition">
+                        <button onclick="toggleMemoryDrawer()" class="px-2.5 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/25 text-purple-300 text-[10px] font-bold transition">
                             🧠 <span class="hidden sm:inline ml-1">Hafıza</span>
                         </button>
                     </div>
                 </div>
 
                 <!-- RP SAHNE (IMG2IMG) ÇEKMECESİ -->
-                <div id="rpSceneDrawer" class="hidden bg-slate-900/90 border-b border-pink-500/20 p-3 text-xs space-y-2.5 shrink-0 z-10 backdrop-blur-lg shadow-xl">
+                <div id="rpSceneDrawer" class="hidden bg-slate-900/95 border-b border-pink-500/25 p-3 text-xs space-y-2.5 shrink-0 z-10 backdrop-blur-lg shadow-xl">
                     <div class="flex items-center justify-between">
                         <span class="font-bold text-pink-400 flex items-center gap-1.5"><span class="text-sm">📸</span> Karakter Referanslı Sahne (img2img)</span>
                         <span class="text-[9px] text-slate-400">Otomatik yüz eşleşmesi</span>
@@ -194,7 +214,7 @@
                 </div>
 
                 <!-- HAFIZA ÇEKMECESİ -->
-                <div id="memoryDrawer" class="hidden bg-slate-900/90 border-b border-purple-500/20 p-3 text-xs space-y-2 shrink-0 z-10 backdrop-blur-lg shadow-xl">
+                <div id="memoryDrawer" class="hidden bg-slate-900/95 border-b border-purple-500/25 p-3 text-xs space-y-2 shrink-0 z-10 backdrop-blur-lg shadow-xl">
                     <div class="flex items-center justify-between">
                         <span class="font-bold text-purple-400 flex items-center gap-1.5"><span class="text-sm">🧠</span> Akıllı Hafıza Özeti</span>
                         <button onclick="manualCompressMemory()" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-bold shadow-md shadow-purple-600/20">Sıkıştır & Özetle</button>
@@ -203,18 +223,19 @@
                 </div>
 
                 <!-- MESAJLAR ALANI -->
-                <div id="rpMessagesBox" class="flex-1 overflow-y-auto p-3 lg:p-6 space-y-4"></div>
+                <div id="rpMessagesBox" class="flex-1 min-h-0 overflow-y-auto p-3 lg:p-6 space-y-4"></div>
 
-                <div class="p-3 bg-slate-900/50 backdrop-blur-md flex items-end gap-2 shrink-0 border-t border-white/5">
-                    <textarea id="rpInput" rows="1" placeholder="*Bir aksiyon yaz* veya &quot;bir şey söyle...&quot;" class="flex-1 bg-[#0a0c14] border border-slate-700/80 rounded-2xl px-4 py-3 text-sm focus:border-purple-500 focus:outline-none resize-none min-h-[46px] max-h-32 shadow-inner" oninput="this.style.height = '';this.style.height = this.scrollHeight + 'px'"></textarea>
-                    <button onclick="regenerateLastRp()" class="h-[46px] w-[46px] flex items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-bold border border-white/5 transition shrink-0" title="Yeniden Üret">🔄</button>
-                    <button onclick="sendRpMessage()" id="rpSendBtn" class="h-[46px] px-5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 font-bold text-xs shadow-lg shadow-purple-600/20 transition shrink-0">Gönder</button>
+                <!-- RP MESAJ YAZMA ALANI (Alt Menünün Hemen Üstünde Sabit Görünür) -->
+                <div class="p-2.5 lg:p-3 input-dock flex items-end gap-2 shrink-0 z-20">
+                    <textarea id="rpInput" rows="1" placeholder="*Bir aksiyon yaz* veya &quot;bir şey söyle...&quot;" onkeydown="if(event.key==='Enter' && !event.shiftKey && window.innerWidth>=1024){event.preventDefault(); sendRpMessage();}" class="flex-1 bg-[#0c0f19] border border-slate-700/80 rounded-2xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/40 focus:outline-none resize-none min-h-[44px] max-h-28 shadow-inner transition" oninput="this.style.height = '';this.style.height = Math.min(this.scrollHeight, 112) + 'px'"></textarea>
+                    <button onclick="regenerateLastRp()" class="h-[44px] w-[44px] flex items-center justify-center rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 text-sm font-bold border border-white/10 transition shrink-0" title="Yeniden Üret">🔄</button>
+                    <button onclick="sendRpMessage()" id="rpSendBtn" class="h-[44px] px-4 lg:px-5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 active:scale-95 font-bold text-xs text-white shadow-lg shadow-purple-600/25 transition shrink-0">Gönder</button>
                 </div>
             </div>
         </section>
 
         <!-- 2. SEKME: ASİSTAN -->
-        <section id="tab_assistant" class="h-full hidden flex-col lg:flex-row overflow-hidden w-full">
+        <section id="tab_assistant" class="flex-1 min-h-0 hidden flex-col lg:flex-row overflow-hidden w-full">
             <aside id="astSidebarPanel" class="fixed lg:static inset-y-0 left-0 z-50 w-[280px] lg:w-[300px] glass border-r border-white/5 flex flex-col shrink-0 h-full overflow-y-auto p-4 space-y-4 -translate-x-full lg:translate-x-0 transition-transform duration-300">
                 <div class="flex items-center justify-between pb-1 border-b lg:border-none border-white/5">
                     <h2 class="text-xs font-bold uppercase tracking-widest text-slate-300">Asistan Geçmişi</h2>
@@ -225,49 +246,49 @@
                 </div>
                 <div id="astChatList" class="space-y-1"></div>
             </aside>
-            <div class="flex-1 flex flex-col h-full overflow-hidden bg-[#0a0c14]">
-                <div class="h-[52px] px-4 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-900/30 backdrop-blur-md z-10">
+            <div class="flex-1 min-h-0 flex flex-col overflow-hidden chat-canvas">
+                <div class="h-[52px] px-4 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-900/45 backdrop-blur-md z-10">
                     <div>
                         <h2 class="font-bold text-xs lg:text-sm flex items-center gap-2"><span class="text-lg">💬</span> AI Asistan</h2>
                         <p class="text-[9px] text-slate-400 hidden sm:block">Sorular, kodlama ve içerik üretimi</p>
                     </div>
-                    <select id="astModelSelect" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-[10px] focus:outline-none"></select>
+                    <select id="astModelSelect" class="bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 text-[10px] focus:border-purple-500 focus:outline-none"></select>
                 </div>
-                <div id="astMessagesBox" class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4"></div>
-                <div class="p-3 bg-slate-900/50 backdrop-blur-md flex gap-2 shrink-0 border-t border-white/5">
-                    <input id="astInput" type="text" placeholder="Asistana istediğini sor..." onkeydown="if(event.key==='Enter') sendAssistantMessage()" class="flex-1 bg-[#0a0c14] border border-slate-700/80 rounded-2xl px-4 py-3 text-sm focus:border-purple-500 focus:outline-none shadow-inner">
-                    <button onclick="sendAssistantMessage()" class="px-6 py-3 rounded-2xl bg-purple-600 hover:opacity-90 font-bold text-xs shadow-lg shadow-purple-600/20 transition">Gönder</button>
+                <div id="astMessagesBox" class="flex-1 min-h-0 overflow-y-auto p-4 lg:p-6 space-y-4"></div>
+                <div class="p-2.5 lg:p-3 input-dock flex items-center gap-2 shrink-0 z-20">
+                    <input id="astInput" type="text" placeholder="Asistana istediğini sor..." onkeydown="if(event.key==='Enter') sendAssistantMessage()" class="flex-1 h-[44px] bg-[#0c0f19] border border-slate-700/80 rounded-2xl px-4 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/40 focus:outline-none shadow-inner">
+                    <button onclick="sendAssistantMessage()" class="h-[44px] px-5 lg:px-6 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 active:scale-95 font-bold text-xs text-white shadow-lg shadow-purple-600/25 transition shrink-0">Gönder</button>
                 </div>
             </div>
         </section>
 
         <!-- 3. SEKME: ORTAK ODA (GLOBAL CHAT) -->
-        <section id="tab_global" class="h-full hidden flex-col max-w-5xl mx-auto w-full lg:p-5 p-0 overflow-hidden">
-            <div class="glass lg:rounded-3xl rounded-none flex-1 flex flex-col overflow-hidden shadow-2xl">
-                <div class="h-[52px] px-4 border-b border-white/5 shrink-0 flex justify-between items-center bg-slate-900/30 backdrop-blur-md z-10">
+        <section id="tab_global" class="flex-1 min-h-0 hidden flex-col max-w-5xl mx-auto w-full lg:p-5 p-0 overflow-hidden">
+            <div class="glass lg:rounded-3xl rounded-none flex-1 min-h-0 flex flex-col overflow-hidden shadow-2xl">
+                <div class="h-[52px] px-4 border-b border-white/5 shrink-0 flex justify-between items-center bg-slate-900/45 backdrop-blur-md z-10">
                     <div>
                         <h2 class="font-bold text-xs lg:text-sm text-cyan-400 flex items-center gap-2"><span class="text-lg">🌐</span> Global Ortak Oda</h2>
                     </div>
                     <button onclick="loadGlobalChat()" class="text-[10px] font-bold text-cyan-300 hover:text-white px-3 py-1.5 rounded-lg bg-cyan-900/30 border border-cyan-500/20 transition">🔄 Yenile</button>
                 </div>
-                <div id="globalMessagesBox" class="flex-1 overflow-y-auto p-3 lg:p-5 space-y-3.5 bg-[#080a12]"></div>
+                <div id="globalMessagesBox" class="flex-1 min-h-0 overflow-y-auto p-3 lg:p-5 space-y-3.5 chat-canvas"></div>
                 
                 <!-- Hızlı Komut Barı (AI Commands) -->
-                <div class="px-3 pt-2 pb-1 bg-slate-900/50 flex gap-1.5 overflow-x-auto scrollbar-hide">
-                    <button onclick="insertCommand('@txt ')" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-bold text-purple-300 border border-white/5 shrink-0">@txt (Yazı)</button>
-                    <button onclick="insertCommand('@img ')" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-bold text-pink-300 border border-white/5 shrink-0">@img (Görsel)</button>
-                    <button onclick="insertCommand('@vid ')" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-bold text-indigo-300 border border-white/5 shrink-0">@vid (Video)</button>
+                <div class="px-3 pt-2 pb-1 bg-slate-900/80 border-t border-white/5 flex gap-1.5 overflow-x-auto scrollbar-hide shrink-0">
+                    <button onclick="insertCommand('@txt ')" class="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-purple-300 border border-white/10 shrink-0">@txt (Yazı)</button>
+                    <button onclick="insertCommand('@img ')" class="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-pink-300 border border-white/10 shrink-0">@img (Görsel)</button>
+                    <button onclick="insertCommand('@vid ')" class="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-indigo-300 border border-white/10 shrink-0">@vid (Video)</button>
                 </div>
 
-                <div class="p-3 border-t border-white/5 flex gap-2 shrink-0 bg-slate-900/50 backdrop-blur-md">
-                    <input id="globalInput" type="text" placeholder="Mesaj veya @komut..." onkeydown="if(event.key==='Enter') sendGlobalMessage()" class="flex-1 bg-[#0a0c14] border border-slate-700/80 rounded-2xl px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none shadow-inner">
-                    <button onclick="sendGlobalMessage()" class="px-5 py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 font-bold text-xs text-white shadow-lg shadow-cyan-600/20 transition">Gönder</button>
+                <div class="p-2.5 lg:p-3 flex items-center gap-2 shrink-0 input-dock z-20">
+                    <input id="globalInput" type="text" placeholder="Mesaj veya @komut..." onkeydown="if(event.key==='Enter') sendGlobalMessage()" class="flex-1 h-[44px] bg-[#0c0f19] border border-slate-700/80 rounded-2xl px-4 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none shadow-inner">
+                    <button onclick="sendGlobalMessage()" class="h-[44px] px-5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 active:scale-95 font-bold text-xs text-white shadow-lg shadow-cyan-600/25 transition shrink-0">Gönder</button>
                 </div>
             </div>
         </section>
 
         <!-- 4. SEKME: ÖZEL MESAJLAR (DM) -->
-        <section id="tab_dm" class="h-full hidden flex-col lg:flex-row overflow-hidden w-full">
+        <section id="tab_dm" class="flex-1 min-h-0 hidden flex-col lg:flex-row overflow-hidden w-full">
             <aside id="dmSidebarPanel" class="fixed lg:static inset-y-0 left-0 z-50 w-[280px] lg:w-[320px] glass border-r border-white/5 flex flex-col shrink-0 h-full overflow-y-auto p-4 space-y-4 -translate-x-full lg:translate-x-0 transition-transform duration-300">
                 <div class="flex items-center justify-between pb-1 border-b lg:border-none border-white/5">
                     <h2 class="text-xs font-bold uppercase tracking-widest text-emerald-400">💌 Kullanıcılar</h2>
@@ -279,9 +300,9 @@
                 <div id="dmContactsList" class="space-y-1 overflow-y-auto flex-1 pb-4"></div>
             </aside>
 
-            <div class="flex-1 flex flex-col h-full overflow-hidden bg-[#0a0c14]">
-                <div class="h-[52px] px-4 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-900/30 backdrop-blur-md z-10">
-                    <div class="flex items-center gap-3">
+            <div class="flex-1 min-h-0 flex flex-col overflow-hidden chat-canvas">
+                <div class="h-[52px] px-4 border-b border-white/5 flex items-center justify-between shrink-0 bg-slate-900/45 backdrop-blur-md z-10">
+                    <div onclick="toggleMobileDrawer()" class="flex items-center gap-3 cursor-pointer lg:cursor-default">
                         <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white text-lg shadow-lg shadow-emerald-500/20">💌</div>
                         <div>
                             <h3 id="activeDmUserTitle" class="font-bold text-xs lg:text-sm">Kişi Seçin</h3>
@@ -290,44 +311,44 @@
                     </div>
                     <button onclick="loadDmMessages()" class="text-[10px] font-bold text-emerald-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-emerald-900/30 border border-emerald-500/20">🔄</button>
                 </div>
-                <div id="dmMessagesBox" class="flex-1 overflow-y-auto p-3 lg:p-5 space-y-3.5">
+                <div id="dmMessagesBox" class="flex-1 min-h-0 overflow-y-auto p-3 lg:p-5 space-y-3.5">
                     <div class="text-center text-slate-500 text-xs mt-20">Kişi seçerek sohbete başlayın.</div>
                 </div>
                 
-                <div class="px-3 pt-2 pb-1 bg-slate-900/50 flex gap-1.5 overflow-x-auto scrollbar-hide">
-                    <button onclick="insertCommand('@txt ', 'dm')" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-bold text-purple-300 border border-white/5 shrink-0">@txt</button>
-                    <button onclick="insertCommand('@img ', 'dm')" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-bold text-pink-300 border border-white/5 shrink-0">@img</button>
-                    <button onclick="insertCommand('@vid ', 'dm')" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-bold text-indigo-300 border border-white/5 shrink-0">@vid</button>
+                <div class="px-3 pt-2 pb-1 bg-slate-900/80 border-t border-white/5 flex gap-1.5 overflow-x-auto scrollbar-hide shrink-0">
+                    <button onclick="insertCommand('@txt ', 'dm')" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-bold text-purple-300 border border-white/10 shrink-0">@txt</button>
+                    <button onclick="insertCommand('@img ', 'dm')" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-bold text-pink-300 border border-white/10 shrink-0">@img</button>
+                    <button onclick="insertCommand('@vid ', 'dm')" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-bold text-indigo-300 border border-white/10 shrink-0">@vid</button>
                 </div>
 
-                <div class="p-3 border-t border-white/5 flex items-center gap-2 shrink-0 bg-slate-900/50 backdrop-blur-md">
-                    <label class="h-[46px] w-[46px] flex items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-lg cursor-pointer border border-white/5 transition shrink-0" title="Görsel Gönder">
+                <div class="p-2.5 lg:p-3 flex items-center gap-2 shrink-0 input-dock z-20">
+                    <label class="h-[44px] w-[44px] flex items-center justify-center rounded-2xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 text-lg cursor-pointer border border-white/10 transition shrink-0" title="Görsel Gönder">
                         📎
                         <input id="dmMediaFile" type="file" accept="image/*" onchange="encodeDmAttachment(this)" class="hidden">
                     </label>
-                    <input id="dmInput" type="text" placeholder="Mesaj veya @komut..." onkeydown="if(event.key==='Enter') sendDmMessage()" class="flex-1 h-[46px] bg-[#0a0c14] border border-slate-700/80 rounded-2xl px-4 text-sm focus:border-emerald-500 focus:outline-none shadow-inner">
-                    <button onclick="sendDmMessage()" class="h-[46px] px-5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-90 font-bold text-xs text-white shadow-lg shadow-emerald-500/20 transition shrink-0">Gönder</button>
+                    <input id="dmInput" type="text" placeholder="Mesaj veya @komut..." onkeydown="if(event.key==='Enter') sendDmMessage()" class="flex-1 h-[44px] bg-[#0c0f19] border border-slate-700/80 rounded-2xl px-4 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none shadow-inner">
+                    <button onclick="sendDmMessage()" class="h-[44px] px-5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-95 active:scale-95 font-bold text-xs text-white shadow-lg shadow-emerald-500/25 transition shrink-0">Gönder</button>
                 </div>
             </div>
         </section>
 
         <!-- 5. SEKME: GÖRSEL STÜDYO -->
-        <section id="tab_image" class="h-full hidden overflow-y-auto p-3 lg:p-6 w-full bg-[#080a12]">
-            <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5 pb-20 lg:pb-8">
+        <section id="tab_image" class="flex-1 min-h-0 hidden overflow-y-auto p-3 lg:p-6 w-full bg-[#080a12]">
+            <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5 pb-12 lg:pb-8">
                 <!-- Kontrol Paneli -->
-                <div class="lg:col-span-4 glass rounded-[2rem] p-5 space-y-4 h-fit border border-pink-500/10 shadow-2xl">
+                <div class="lg:col-span-4 glass rounded-[2rem] p-5 space-y-4 h-fit border border-pink-500/15 shadow-2xl">
                     <div class="flex items-center justify-between">
                         <h2 class="font-extrabold text-lg text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400 flex items-center gap-2"><span class="text-xl">🎨</span> Görsel Stüdyo</h2>
-                        <span id="imgModeBadge" class="text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md bg-pink-500/10 text-pink-300 font-bold border border-pink-500/20">TXT2IMG</span>
+                        <span id="imgModeBadge" class="text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md bg-pink-500/15 text-pink-300 font-bold border border-pink-500/25">TXT2IMG</span>
                     </div>
 
                     <!-- IMG2IMG Kaynak Dosya -->
                     <div class="p-3.5 rounded-2xl bg-[#050609] border border-slate-800 space-y-2.5">
                         <div class="flex items-center justify-between">
-                            <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400">🖼️ Kaynak Görsel (Opsiyonel)</label>
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400">🖼️ Kaynak Görsel (Varsa IMG2IMG)</label>
                             <button onclick="clearSourceMedia('image')" id="clearImgSourceBtn" class="hidden text-[10px] text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded">Temizle ✕</button>
                         </div>
-                        <input id="imgSourceFile" type="file" accept="image/*" onchange="handleSourceFileUpload(this, 'image')" class="block w-full text-[11px] text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-pink-500/10 file:text-pink-400 hover:file:bg-pink-500/20 cursor-pointer">
+                        <input id="imgSourceFile" type="file" accept="image/*" onchange="handleSourceFileUpload(this, 'image')" class="block w-full text-[11px] text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-pink-500/15 file:text-pink-300 hover:file:bg-pink-500/25 cursor-pointer">
                         <div id="imgSourcePreviewWrap" class="hidden items-center gap-3 pt-2">
                             <img id="imgSourcePreview" src="" class="w-14 h-14 rounded-xl object-cover border border-pink-500/40 shrink-0">
                             <div class="flex-1 space-y-1.5">
@@ -368,7 +389,7 @@
                         <select id="imgTrainedSelect" class="w-full bg-[#050609] border border-slate-800 rounded-xl p-3 text-xs focus:border-pink-500 focus:outline-none"></select>
                     </div>
                     
-                    <button onclick="generateMedia('image')" id="btnGenImg" class="w-full py-3.5 mt-2 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 font-extrabold text-sm shadow-xl shadow-pink-600/20 transition">🎨 Görseli Üret</button>
+                    <button onclick="generateMedia('image')" id="btnGenImg" class="w-full py-3.5 mt-2 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 font-extrabold text-sm shadow-xl shadow-pink-600/25 transition">🎨 Görseli Üret</button>
                 </div>
 
                 <!-- Galeri -->
@@ -380,21 +401,21 @@
         </section>
 
         <!-- 6. SEKME: VİDEO STÜDYO -->
-        <section id="tab_video" class="h-full hidden overflow-y-auto p-3 lg:p-6 w-full bg-[#080a12]">
-            <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5 pb-20 lg:pb-8">
-                <div class="lg:col-span-4 glass rounded-[2rem] p-5 space-y-4 h-fit border border-indigo-500/10 shadow-2xl">
+        <section id="tab_video" class="flex-1 min-h-0 hidden overflow-y-auto p-3 lg:p-6 w-full bg-[#080a12]">
+            <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-5 pb-12 lg:pb-8">
+                <div class="lg:col-span-4 glass rounded-[2rem] p-5 space-y-4 h-fit border border-indigo-500/15 shadow-2xl">
                     <div class="flex items-center justify-between">
                         <h2 class="font-extrabold text-lg text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 flex items-center gap-2"><span class="text-xl">🎬</span> Video Stüdyo</h2>
-                        <span id="vidModeBadge" class="text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-300 font-bold border border-indigo-500/20">TXT2VID</span>
+                        <span id="vidModeBadge" class="text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-md bg-indigo-500/15 text-indigo-300 font-bold border border-indigo-500/25">TXT2VID</span>
                     </div>
 
                     <!-- VID2VID / IMG2VID Kaynak Dosya -->
                     <div class="p-3.5 rounded-2xl bg-[#050609] border border-slate-800 space-y-2.5">
                         <div class="flex items-center justify-between">
-                            <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400">🎞️ Kaynak Medya (Opsiyonel)</label>
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400">🎞️ Kaynak Görsel / Video (Varsa IMG2VID)</label>
                             <button onclick="clearSourceMedia('video')" id="clearVidSourceBtn" class="hidden text-[10px] text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded">Temizle ✕</button>
                         </div>
-                        <input id="vidSourceFile" type="file" accept="image/*,video/*" onchange="handleSourceFileUpload(this, 'video')" class="block w-full text-[11px] text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-indigo-500/10 file:text-indigo-400 hover:file:bg-indigo-500/20 cursor-pointer">
+                        <input id="vidSourceFile" type="file" accept="image/*,video/*" onchange="handleSourceFileUpload(this, 'video')" class="block w-full text-[11px] text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-indigo-500/15 file:text-indigo-300 hover:file:bg-indigo-500/25 cursor-pointer">
                         <div id="vidSourcePreviewWrap" class="hidden items-center gap-3 pt-2">
                             <div id="vidSourceThumbBox" class="w-14 h-14 rounded-xl overflow-hidden border border-indigo-500/40 bg-[#0a0c14] flex items-center justify-center text-[9px] font-bold text-indigo-400 shrink-0"></div>
                             <div class="flex-1 space-y-1.5">
@@ -427,7 +448,7 @@
                         </div>
                     </div>
                     
-                    <button onclick="generateMedia('video')" id="btnGenVid" class="w-full py-3.5 mt-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-90 font-extrabold text-sm shadow-xl shadow-indigo-600/20 transition">🎬 Videoyu Üret</button>
+                    <button onclick="generateMedia('video')" id="btnGenVid" class="w-full py-3.5 mt-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-90 font-extrabold text-sm shadow-xl shadow-indigo-600/25 transition">🎬 Videoyu Üret</button>
                 </div>
 
                 <div class="lg:col-span-8 space-y-4">
@@ -438,13 +459,13 @@
         </section>
 
         <!-- 7. SEKME: STÜDYO (KARAKTER & LORA) -->
-        <section id="tab_studio" class="h-full hidden overflow-y-auto p-3 lg:p-6 w-full bg-[#080a12]">
-            <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20 lg:pb-8">
+        <section id="tab_studio" class="flex-1 min-h-0 hidden overflow-y-auto p-3 lg:p-6 w-full bg-[#080a12]">
+            <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12 lg:pb-8">
                 <!-- Karakter -->
-                <div class="glass rounded-[2rem] p-5 lg:p-6 space-y-4 border border-purple-500/10">
+                <div class="glass rounded-[2rem] p-5 lg:p-6 space-y-4 border border-purple-500/15">
                     <div class="flex items-center justify-between pb-2 border-b border-white/5">
                         <h2 class="font-bold text-base text-purple-400 flex items-center gap-2">🎭 Yeni Karakter Yarat</h2>
-                        <span id="charQuotaBadge" class="text-[10px] px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-300 font-bold border border-purple-500/20">Kota: -</span>
+                        <span id="charQuotaBadge" class="text-[10px] px-2.5 py-1 rounded-md bg-purple-500/15 text-purple-300 font-bold border border-purple-500/25">Kota: -</span>
                     </div>
                     
                     <div class="grid grid-cols-2 gap-3">
@@ -453,11 +474,11 @@
                     </div>
                     <div class="flex items-center gap-3">
                         <input id="cAvatarUrl" type="text" placeholder="Avatar URL" class="flex-1 bg-[#050609] border border-slate-800 rounded-xl p-3 text-xs focus:border-purple-500 outline-none">
-                        <input id="cAvatarFile" type="file" accept="image/*" onchange="encodeAvatarFile(this)" class="w-24 text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-purple-500/10 file:text-purple-400 hover:file:bg-purple-500/20 cursor-pointer">
+                        <input id="cAvatarFile" type="file" accept="image/*" onchange="encodeAvatarFile(this)" class="w-24 text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-purple-500/15 file:text-purple-300 hover:file:bg-purple-500/25 cursor-pointer">
                     </div>
 
                     <!-- Referans Görseli -->
-                    <div class="p-3.5 rounded-2xl bg-purple-950/10 border border-purple-500/20 space-y-3">
+                    <div class="p-3.5 rounded-2xl bg-purple-950/15 border border-purple-500/25 space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-[11px] font-bold text-purple-400">📸 1 Adet Referans Görseli (RP Sahneleri İçin)</span>
                             <span id="charRefStatus" class="text-[9px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded">Seçilmedi</span>
@@ -467,7 +488,7 @@
                             <button type="button" onclick="generateCharReferenceImage()" id="btnGenCharRef" class="px-4 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-[11px] shrink-0 shadow-lg shadow-pink-600/20">✨ Üret</button>
                         </div>
                         <div class="flex items-center gap-3 pt-1">
-                            <input id="cRefFile" type="file" accept="image/*" onchange="encodeCharRefFile(this)" class="flex-1 text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-purple-500/10 file:text-purple-400 cursor-pointer">
+                            <input id="cRefFile" type="file" accept="image/*" onchange="encodeCharRefFile(this)" class="flex-1 text-[10px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-purple-500/15 file:text-purple-300 cursor-pointer">
                             <img id="cRefPreview" src="" class="hidden w-12 h-12 rounded-xl object-cover border border-pink-500/50 shadow-lg">
                         </div>
                     </div>
@@ -483,14 +504,14 @@
                             <input id="cPublic" type="checkbox" checked class="accent-purple-500"> Vitrinde
                         </label>
                     </div>
-                    <button onclick="createCharacter()" class="w-full py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 font-bold text-sm shadow-xl shadow-purple-600/20 transition mt-2">✨ Kaydet ve Başla</button>
+                    <button onclick="createCharacter()" class="w-full py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 font-bold text-sm shadow-xl shadow-purple-600/25 transition mt-2">✨ Kaydet ve Başla</button>
                 </div>
 
                 <!-- Özel Model (LoRA) -->
-                <div class="glass rounded-[2rem] p-5 lg:p-6 space-y-4 h-fit border border-emerald-500/10">
+                <div class="glass rounded-[2rem] p-5 lg:p-6 space-y-4 h-fit border border-emerald-500/15">
                     <div class="flex items-center justify-between pb-2 border-b border-white/5">
                         <h2 class="font-bold text-base text-emerald-400 flex items-center gap-2">🧬 Özel Model (LoRA) Eğitimi</h2>
-                        <span id="trainQuotaBadge" class="text-[10px] px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-300 font-bold border border-emerald-500/20">Kota: -</span>
+                        <span id="trainQuotaBadge" class="text-[10px] px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/25">Kota: -</span>
                     </div>
                     <input id="tName" type="text" placeholder="Model Adı (Örn: Seraphina v2)" class="w-full bg-[#050609] border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 outline-none">
                     <div class="grid grid-cols-2 gap-3">
@@ -502,7 +523,7 @@
                         <input id="tTrigger" type="text" placeholder="Tetikleyici: srph_chr" class="bg-[#050609] border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 outline-none">
                     </div>
                     <textarea id="tData" rows="4" placeholder="Eğitim Verisi (Karakter detayları, yüz hatları)..." class="w-full bg-[#050609] border border-slate-800 rounded-xl p-3 text-xs focus:border-emerald-500 outline-none resize-none"></textarea>
-                    <button onclick="trainCustomModel()" class="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 font-bold text-sm shadow-xl shadow-emerald-600/20 transition">🚀 Eğit & Havuza Ekle</button>
+                    <button onclick="trainCustomModel()" class="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 font-bold text-sm shadow-xl shadow-emerald-600/25 transition">🚀 Eğit & Havuza Ekle</button>
 
                     <div class="pt-4 border-t border-white/5">
                         <h3 class="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2.5 ml-1">Eğitilmiş Modellerin</h3>
@@ -514,25 +535,25 @@
     </main>
 
     <!-- ==================== MOBİL ALT NAVİGASYON BAR (Sadece Telefon <lg) ==================== -->
-    <nav class="lg:hidden fixed bottom-0 left-0 right-0 glass h-[60px] pb-safe border-t border-white/5 grid grid-cols-5 items-center shrink-0 z-40 bg-[#0a0c14]/90 backdrop-blur-xl">
-        <button onclick="switchTab('rp')" id="mTabBtn_rp" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-purple-400 font-bold transition">
-            <span class="text-xl">🎭</span>
+    <nav id="mobileBottomNav" class="lg:hidden fixed bottom-0 left-0 right-0 glass min-h-[62px] pb-safe border-t border-white/10 grid grid-cols-5 items-center px-1.5 shrink-0 z-40 bg-[#090b13]/95 backdrop-blur-xl shadow-[0_-8px_30px_rgba(0,0,0,0.6)]">
+        <button onclick="switchTab('rp')" id="mTabBtn_rp" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-purple-400 font-bold bg-purple-500/10 transition">
+            <span class="text-lg">🎭</span>
             <span class="text-[9px] mt-0.5 font-extrabold tracking-wide">RP</span>
         </button>
-        <button onclick="switchTab('assistant')" id="mTabBtn_assistant" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-500 transition">
-            <span class="text-xl">💬</span>
+        <button onclick="switchTab('assistant')" id="mTabBtn_assistant" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-400 hover:text-white transition">
+            <span class="text-lg">💬</span>
             <span class="text-[9px] mt-0.5 font-bold tracking-wide">Asistan</span>
         </button>
-        <button onclick="switchTab('global')" id="mTabBtn_global" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-500 transition relative">
-            <span class="text-xl">🌐</span>
+        <button onclick="switchTab('global')" id="mTabBtn_global" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-400 hover:text-white transition relative">
+            <span class="text-lg">🌐</span>
             <span class="text-[9px] mt-0.5 font-bold tracking-wide">Ortak</span>
         </button>
-        <button onclick="switchTab('image')" id="mTabBtn_image" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-500 transition">
-            <span class="text-xl">🎨</span>
+        <button onclick="switchTab('image')" id="mTabBtn_image" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-400 hover:text-white transition">
+            <span class="text-lg">🎨</span>
             <span class="text-[9px] mt-0.5 font-bold tracking-wide">Görsel</span>
         </button>
-        <button onclick="switchTab('video')" id="mTabBtn_video" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-500 transition">
-            <span class="text-xl">🎬</span>
+        <button onclick="switchTab('video')" id="mTabBtn_video" class="flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-400 hover:text-white transition">
+            <span class="text-lg">🎬</span>
             <span class="text-[9px] mt-0.5 font-bold tracking-wide">Video</span>
         </button>
     </nav>
@@ -573,10 +594,31 @@
             if (now - lastTouchEnd <= 250 && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A') e.preventDefault();
             lastTouchEnd = now;
         }, { passive: false });
-        
-        // CSS pb-safe adaptasyonu
-        document.documentElement.style.setProperty('--sat', 'env(safe-area-inset-top)');
-        document.documentElement.style.setProperty('--sab', 'env(safe-area-inset-bottom)');
+
+        // Mobil Klavye Açıldığında Viewport ve Alt Menü Yönetimi
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                const isKeyboardOpen = window.visualViewport.height < window.innerHeight * 0.78;
+                const nav = document.getElementById("mobileBottomNav");
+                const main = document.getElementById("mainContentArea");
+                if (nav && main && window.innerWidth < 1024) {
+                    if (isKeyboardOpen) {
+                        nav.classList.add("hidden");
+                        main.classList.remove("pb-[62px]");
+                    } else {
+                        nav.classList.remove("hidden");
+                        main.classList.add("pb-[62px]");
+                    }
+                }
+                const activeBox = document.getElementById(
+                    STATE.activeTab === "rp" ? "rpMessagesBox" :
+                    STATE.activeTab === "assistant" ? "astMessagesBox" :
+                    STATE.activeTab === "global" ? "globalMessagesBox" :
+                    STATE.activeTab === "dm" ? "dmMessagesBox" : ""
+                );
+                if (activeBox) activeBox.scrollTop = activeBox.scrollHeight;
+            });
+        }
 
         let STATE = {
             user: null, users_directory: [], settings: {}, models: [], characters: [], trained_models: [],
@@ -652,7 +694,10 @@
             loadDmContacts();
 
             if (!STATE.activeRpChat && STATE.chats.length > 0) selectRpChat(STATE.chats[0].id);
+            else renderRpMessages();
+
             if (!STATE.activeAstChat && STATE.assistant_chats.length > 0) selectAstChat(STATE.assistant_chats[0].id);
+            else renderAssistantMessages();
         }
 
         function renderHeader() {
@@ -701,9 +746,9 @@
             const communityChars = STATE.characters.filter(c => c.is_public && c.creator !== STATE.user.username);
             const buildCharList = (chars) => chars.map(c => `
                 <div onclick="startNewRpChat('${c.id}'); closeMobileDrawer();" class="glass-card p-2 rounded-2xl flex items-center gap-3 cursor-pointer hover:border-purple-500/50 hover:bg-white/5 transition">
-                    <img src="${c.avatar}" class="w-10 h-10 rounded-xl object-cover shrink-0 border border-white/5">
+                    <img src="${c.avatar}" class="w-10 h-10 rounded-xl object-cover shrink-0 border border-white/10">
                     <div class="min-w-0 flex-1">
-                        <h4 class="text-[11px] font-bold truncate">${c.name}</h4>
+                        <h4 class="text-[11px] font-bold truncate text-white">${c.name}</h4>
                         <p class="text-[9px] text-slate-400 truncate mt-0.5">${c.title || ''}</p>
                     </div>
                 </div>
@@ -740,21 +785,32 @@
 
         function renderRpMessages() {
             const box = document.getElementById("rpMessagesBox");
-            if (!STATE.activeRpChat) { box.innerHTML = `<div class="text-center text-slate-500 text-xs mt-20">Menüden bir karakter seçin.</div>`; return; }
+            if (!STATE.activeRpChat) {
+                box.innerHTML = `
+                <div class="h-full flex flex-col items-center justify-center text-center px-4">
+                    <div class="glass-card max-w-xs w-full rounded-3xl p-6 space-y-3.5 shadow-2xl border border-purple-500/15">
+                        <div class="w-12 h-12 mx-auto rounded-2xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-2xl">🎭</div>
+                        <h4 class="font-extrabold text-sm text-white">Sohbet Başlatılmadı</h4>
+                        <p class="text-[11px] text-slate-400 leading-relaxed">Menüden mevcut bir karakter seçin veya kendi özel karakterinizi oluşturun.</p>
+                        <button onclick="toggleMobileDrawer()" class="lg:hidden w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white shadow-lg shadow-purple-600/20 transition">Karakter Seç</button>
+                    </div>
+                </div>`;
+                return;
+            }
             box.innerHTML = STATE.activeRpChat.messages.map(m => {
                 const isUser = m.role === "user";
                 const swipes = m.swipes || [m.content];
                 const swipeNav = (!isUser && swipes.length > 1) ? `
-                    <div class="inline-flex items-center gap-1.5 bg-[#0a0c14] px-2 py-0.5 rounded-lg border border-white/5 text-[9px] text-purple-300 shadow-inner">
+                    <div class="inline-flex items-center gap-1.5 bg-[#0a0c14] px-2 py-0.5 rounded-lg border border-white/10 text-[9px] text-purple-300 shadow-inner">
                         <button onclick="swipeRpMsg('${m.id}', -1)" class="hover:text-white">◀</button>
                         <span>${(m.active_swipe || 0) + 1}/${swipes.length}</span>
                         <button onclick="swipeRpMsg('${m.id}', 1)" class="hover:text-white">▶</button>
                     </div>` : "";
-                const mediaHtml = m.media_url ? `<img src="${m.media_url}" onclick="openLightbox('${m.media_url}', 'image', '${m.media_id || ''}')" class="mt-2.5 rounded-xl max-h-72 w-full object-cover border border-pink-500/20 shadow-lg cursor-pointer transition hover:opacity-90">` : "";
+                const mediaHtml = m.media_url ? `<img src="${m.media_url}" onclick="openLightbox('${m.media_url}', 'image', '${m.media_id || ''}')" class="mt-2.5 rounded-xl max-h-72 w-full object-cover border border-pink-500/25 shadow-lg cursor-pointer transition hover:opacity-90">` : "";
 
                 return `
                 <div class="flex ${isUser ? 'justify-end' : 'justify-start'} group">
-                    <div class="max-w-[85%] lg:max-w-2xl rounded-2xl p-3.5 ${isUser ? 'bg-purple-900/40 border border-purple-500/30' : 'glass-card'} space-y-1.5 shadow-md">
+                    <div class="max-w-[88%] lg:max-w-2xl rounded-2xl p-3.5 ${isUser ? 'bg-gradient-to-br from-purple-900/55 to-indigo-900/45 border border-purple-500/35' : 'glass-card'} space-y-1.5 shadow-lg">
                         <div class="flex items-center justify-between gap-3 text-[10px] text-slate-400">
                             <span class="font-extrabold tracking-wide ${isUser ? 'text-purple-300' : 'text-indigo-300'}">${isUser ? (STATE.user.persona_name || STATE.user.username) : STATE.activeRpChat.character_name}</span>
                             <div class="flex items-center gap-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -763,7 +819,7 @@
                                 <button onclick="deleteRpMsg('${m.id}')" class="hover:text-rose-400 transition" title="Sil">🗑️</button>
                             </div>
                         </div>
-                        <div class="text-xs lg:text-[13px] leading-relaxed">${formatRpText(m.content)}</div>
+                        <div class="text-xs lg:text-[13px] leading-relaxed text-slate-100">${formatRpText(m.content)}</div>
                         ${mediaHtml}
                     </div>
                 </div>`;
@@ -775,7 +831,7 @@
         function toggleMemoryDrawer() { document.getElementById("memoryDrawer").classList.toggle("hidden"); }
 
         async function generateRpSceneImage() {
-            if (!STATE.activeRpChat) return;
+            if (!STATE.activeRpChat) return alert("Önce bir karakter seçin!");
             const btn = document.getElementById("rpSceneBtn");
             btn.disabled = true; btn.innerText = "⏳";
             const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/scene-image`, {
@@ -796,7 +852,7 @@
         }
 
         async function sendRpMessage() {
-            if (!STATE.activeRpChat) return;
+            if (!STATE.activeRpChat) return alert("Önce sol menüden bir karakter seçin!");
             const input = document.getElementById("rpInput");
             const content = input.value.trim();
             if (!content) return;
@@ -808,7 +864,7 @@
                 body: JSON.stringify({ content, model_id: document.getElementById("rpModelSelect").value })
             });
             const data = await res.json();
-            btn.disabled = false; btn.innerText = "Gönder";
+            btn.disabled = false; btn.innerText = STATE.settings.ui_btn_send || "Gönder";
             if (data.error) return alert(data.error);
             updateChatInState(data.chat); STATE.user.credits = data.credits; renderHeader();
         }
@@ -874,10 +930,20 @@
         }
         function renderAssistantMessages() {
             const box = document.getElementById("astMessagesBox");
-            if (!STATE.activeAstChat) { box.innerHTML = `<div class="text-center text-slate-500 text-xs mt-20">Soru sorarak başlayın.</div>`; return; }
+            if (!STATE.activeAstChat) {
+                box.innerHTML = `
+                <div class="h-full flex flex-col items-center justify-center text-center px-4">
+                    <div class="glass-card max-w-xs w-full rounded-3xl p-6 space-y-2.5 shadow-xl border border-indigo-500/15">
+                        <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-2xl">💬</div>
+                        <h4 class="font-extrabold text-sm text-white">AI Asistan Hazır</h4>
+                        <p class="text-[11px] text-slate-400">Aşağıdaki kutuya mesajınızı yazarak yeni bir sohbet başlatın.</p>
+                    </div>
+                </div>`;
+                return;
+            }
             box.innerHTML = STATE.activeAstChat.messages.map(m => `
                 <div class="flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}">
-                    <div class="max-w-[85%] lg:max-w-2xl rounded-2xl p-3.5 text-xs lg:text-[13px] leading-relaxed shadow-md ${m.role === 'user' ? 'bg-purple-600 text-white' : 'glass-card text-slate-200'} whitespace-pre-wrap">${m.content}</div>
+                    <div class="max-w-[88%] lg:max-w-2xl rounded-2xl p-3.5 text-xs lg:text-[13px] leading-relaxed shadow-md ${m.role === 'user' ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white' : 'glass-card text-slate-200'} whitespace-pre-wrap">${m.content}</div>
                 </div>`).join("");
             box.scrollTop = box.scrollHeight;
         }
@@ -901,10 +967,10 @@
                 box.innerHTML = data.messages.map(m => {
                     const isAi = (m.type === "ai_text");
                     const canDel = STATE.user && (m.user === STATE.user.username || STATE.user.role === "admin");
-                    let cH = m.type === "image" ? `<img src="${m.file_path}" onclick="openLightbox('${m.file_path}', 'image', '${m.id}')" class="w-full sm:w-64 h-auto sm:h-64 object-cover rounded-xl mt-2 cursor-pointer border border-white/5 shadow-md">`
-                               : m.type === "video" ? `<video src="${m.file_path}" class="w-full sm:w-64 h-auto rounded-xl mt-2 border border-white/5 shadow-md" controls></video><button onclick="openLightbox('${m.file_path}', 'video', '${m.id}')" class="mt-1.5 text-[10px] bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 font-semibold shadow-inner">Tam Ekran</button>`
+                    let cH = m.type === "image" ? `<img src="${m.file_path}" onclick="openLightbox('${m.file_path}', 'image', '${m.id}')" class="w-full sm:w-64 h-auto sm:h-64 object-cover rounded-xl mt-2 cursor-pointer border border-white/10 shadow-md">`
+                               : m.type === "video" ? `<video src="${m.file_path}" class="w-full sm:w-64 h-auto rounded-xl mt-2 border border-white/10 shadow-md" controls></video><button onclick="openLightbox('${m.file_path}', 'video', '${m.id}')" class="mt-1.5 text-[10px] bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 font-semibold shadow-inner">Tam Ekran</button>`
                                : `<div class="whitespace-pre-wrap text-xs lg:text-[13px] leading-relaxed">${m.content}</div>`;
-                    return `<div class="flex flex-col bg-slate-900/60 p-3.5 rounded-2xl border ${isAi ? 'border-cyan-500/20 ml-5 shadow-lg shadow-cyan-500/5' : 'border-white/5'} shadow-sm">
+                    return `<div class="flex flex-col bg-slate-900/75 p-3.5 rounded-2xl border ${isAi ? 'border-cyan-500/25 ml-5 shadow-lg shadow-cyan-500/5' : 'border-white/5'} shadow-sm">
                         <div class="flex items-center justify-between mb-1.5">
                             <div class="flex items-center gap-2">
                                 <span class="font-extrabold tracking-wide text-[10px] ${isAi ? 'text-cyan-400' : 'text-purple-300'}">${m.user}</span>
@@ -978,8 +1044,8 @@
                 const isMine = m.sender === STATE.user.username; const canDel = isMine || STATE.user.role === "admin";
                 const isAi = m.sender === "NEXUS AI";
                 let cH = m.media_url ? (m.media_url.includes(".mp4") 
-                            ? `<video src="${m.media_url}" class="mt-2 w-full max-w-xs rounded-xl shadow-md border border-white/5" controls></video>` 
-                            : `<img src="${m.media_url}" onclick="openLightbox('${m.media_url}', 'image', '')" class="mt-2 rounded-xl max-h-56 w-full object-cover cursor-pointer border border-white/5 shadow-md">`) : "";
+                            ? `<video src="${m.media_url}" class="mt-2 w-full max-w-xs rounded-xl shadow-md border border-white/10" controls></video>` 
+                            : `<img src="${m.media_url}" onclick="openLightbox('${m.media_url}', 'image', '')" class="mt-2 rounded-xl max-h-56 w-full object-cover cursor-pointer border border-white/10 shadow-md">`) : "";
                 
                 return `<div class="flex ${isMine ? 'justify-end' : (isAi ? 'justify-center' : 'justify-start')}">
                     <div class="max-w-[85%] lg:max-w-md rounded-2xl p-3.5 ${isMine ? 'bg-emerald-900/40 border border-emerald-500/30' : (isAi ? 'bg-indigo-900/40 border border-indigo-500/30 text-center' : 'glass-card')} space-y-1.5 shadow-md">
@@ -997,7 +1063,7 @@
             box.scrollTop = box.scrollHeight;
         }
         async function sendDmMessage() {
-            if (!STATE.activeDmUser) return;
+            if (!STATE.activeDmUser) return alert("Önce sol menüden bir kişi seçin!");
             const input = document.getElementById("dmInput"); const content = input.value.trim();
             if (!content && !STATE.dmAttachmentBase64) return;
             input.value = ""; input.placeholder = "Mesaj veya @komut...";
@@ -1012,7 +1078,7 @@
             loadDmMessages(); loadDmContacts();
         }
 
-        // --- DOSYA YÜKLEME & STÜDYO (TXT2IMG/IMG2IMG/VID2VID) ---
+        // --- DOSYA YÜKLEME & STÜDYO (TXT2IMG/IMG2IMG/IMG2VID/VID2VID) ---
         function handleSourceFileUpload(input, tType) {
             const file = input.files[0]; if (!file) return;
             const reader = new FileReader(); reader.onload = () => { setSourceMediaForStudio(tType, reader.result); }; reader.readAsDataURL(file);
@@ -1083,14 +1149,14 @@
                 <div class="glass-card rounded-[1.5rem] overflow-hidden flex flex-col group shadow-lg">
                     <div class="relative w-full h-48 lg:h-56 cursor-pointer overflow-hidden" onclick="openLightbox('${m.preview_url}', 'image', '${m.id}')">
                         <img src="${m.preview_url}" loading="lazy" class="w-full h-full object-cover bg-[#050609] transition-transform duration-500 group-hover:scale-105">
-                        <span class="absolute top-2 left-2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-[9px] font-extrabold tracking-widest uppercase text-pink-300 border border-white/5">${m.mode || 'img'}</span>
+                        <span class="absolute top-2 left-2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-[9px] font-extrabold tracking-widest uppercase text-pink-300 border border-white/10">${m.mode || 'img'}</span>
                     </div>
                     <div class="p-3.5 space-y-3 bg-gradient-to-b from-transparent to-[#0a0c14]">
                         <p class="text-[11px] text-slate-300 truncate font-medium">${m.prompt}</p>
                         <div class="flex items-center justify-between gap-1.5">
                             <div class="flex gap-1.5">
-                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}', 'image', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-pink-600/30 border border-white/5 text-[9px] font-bold text-pink-300 uppercase tracking-widest transition">✏️ img2img</button>
-                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}', 'video', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600/30 border border-white/5 text-[9px] font-bold text-indigo-300 uppercase tracking-widest transition">🎬 img2vid</button>
+                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}', 'image', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-pink-600/30 border border-white/10 text-[9px] font-bold text-pink-300 uppercase tracking-widest transition">✏️ img2img</button>
+                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}', 'video', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600/30 border border-white/10 text-[9px] font-bold text-indigo-300 uppercase tracking-widest transition">🎬 img2vid</button>
                             </div>
                             <a href="/api/media/download/${m.id}" class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow-md">⬇</a>
                         </div>
@@ -1102,14 +1168,14 @@
                 <div class="glass-card rounded-[1.5rem] overflow-hidden flex flex-col group shadow-lg">
                     <div class="relative w-full h-48 lg:h-56 bg-[#050609]">
                         <video src="${m.preview_url}" controls preload="metadata" class="w-full h-full object-cover"></video>
-                        <span class="absolute top-2 left-2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-[9px] font-extrabold tracking-widest uppercase text-indigo-300 border border-white/5 z-10 pointer-events-none">${m.mode || 'vid'}</span>
+                        <span class="absolute top-2 left-2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-[9px] font-extrabold tracking-widest uppercase text-indigo-300 border border-white/10 z-10 pointer-events-none">${m.mode || 'vid'}</span>
                     </div>
                     <div class="p-3.5 space-y-3 bg-gradient-to-b from-transparent to-[#0a0c14]">
                         <p class="text-[11px] text-slate-300 truncate font-medium">${m.prompt}</p>
                         <div class="flex items-center justify-between gap-1.5">
                             <div class="flex gap-1.5">
-                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}', 'video', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600/30 border border-white/5 text-[9px] font-bold text-cyan-300 uppercase tracking-widest transition">🔄 vid2vid</button>
-                                <button onclick="openLightbox('${m.preview_url}', 'video', '${m.id}')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 border border-white/5 text-[9px] font-bold text-slate-300 uppercase tracking-widest transition">🔍</button>
+                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}', 'video', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600/30 border border-white/10 text-[9px] font-bold text-cyan-300 uppercase tracking-widest transition">🔄 vid2vid</button>
+                                <button onclick="openLightbox('${m.preview_url}', 'video', '${m.id}')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-[9px] font-bold text-slate-300 uppercase tracking-widest transition">🔍</button>
                             </div>
                             <a href="/api/media/download/${m.id}" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-md">⬇</a>
                         </div>
@@ -1207,7 +1273,7 @@
                 const mobBtn = document.getElementById("mTabBtn_" + t);
                 if (sec) { sec.classList.add("hidden"); sec.classList.remove("flex"); }
                 if (pcBtn) pcBtn.className = "tab-btn w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-xs font-bold transition text-slate-400 hover:text-white hover:bg-white/5";
-                if (mobBtn) mobBtn.className = "flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-500 transition relative";
+                if (mobBtn) mobBtn.className = "flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-400 hover:text-white transition relative";
             });
 
             const target = document.getElementById("tab_" + tab);
@@ -1217,7 +1283,7 @@
             if (activePc) activePc.className = "tab-btn w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-xs font-bold transition bg-purple-600 text-white shadow-lg shadow-purple-600/20";
             
             const activeMob = document.getElementById("mTabBtn_" + tab);
-            if (activeMob) activeMob.className = "flex flex-col items-center justify-center py-1.5 rounded-xl text-purple-400 font-bold transition bg-purple-500/10";
+            if (activeMob) activeMob.className = "flex flex-col items-center justify-center py-1.5 rounded-xl text-purple-400 font-bold transition bg-purple-500/15";
 
             if (globalPollInterval) { clearInterval(globalPollInterval); globalPollInterval = null; }
             if (dmPollInterval) { clearInterval(dmPollInterval); dmPollInterval = null; }
