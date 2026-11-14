@@ -17,7 +17,8 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "super-secret-ai-rp-studio-key-2026")
 
-DB_FILE = "db.json"
+# HATA ÇÖZÜMÜ 1: Göreceli yol yerine tam mutlak yol (absolute path) kullanıldı.
+DB_FILE = os.path.join(app.root_path, "db.json")
 db_lock = threading.Lock()
 
 # Medyaları fiziksel diskte saklamak için statik klasör yolu
@@ -202,7 +203,6 @@ def ensure_db_compatibility(loaded):
     if "dms" not in loaded or not isinstance(loaded["dms"], dict):
         loaded["dms"] = {}
 
-    # Eski edit-image override'larını temizle ki adaptif router txt2img/img2img ayrımını otomatik yapsın
     for m in loaded.get("models", []):
         if m.get("endpoint_override") in [
             "https://api.venice.ai/api/v1/image/edit-image",
@@ -272,8 +272,6 @@ def save_db():
 
 
 load_db()
-
-# --- YARDIMCI FONKSİYONLAR & DEKORATÖRLER ---
 
 
 def get_current_user():
@@ -412,8 +410,6 @@ def resolve_source_media_to_b64(source_media):
     return None, None
 
 
-# --- VENICE AI & LLM İSTEMCİSİ ---
-
 def call_llm_api(messages, model_api_id, endpoint_override="", temperature=None, max_tokens=None):
     api_key = DB["settings"].get("venice_api_key") or os.getenv("VENICE_API_KEY", "")
     url = endpoint_override.strip() if endpoint_override else DB["settings"].get("chat_endpoint", "https://api.venice.ai/api/v1/chat/completions")
@@ -478,10 +474,7 @@ def compress_chat_memory_if_needed(chat, force=False):
         return False
 
 
-# --- AKILLI, SANSÜRSÜZ (ANTI-BLUR) & SIFIR HATALI VENICE AI GÖRSEL / VİDEO MOTORU ---
-
 def is_response_blurred(resp):
-    """Venice AI yanıtında bulanıklaştırma (content violation / blur) olup olmadığını tespit eder."""
     for h_key, h_val in resp.headers.items():
         kl = h_key.lower()
         vl = str(h_val).lower().strip()
@@ -500,7 +493,6 @@ def is_response_blurred(resp):
 
 
 def extract_image_from_response(resp):
-    """Venice AI'dan dönen binary görsel veya JSON yanıtını tek formatta (data_url) çıkarır."""
     ctype = (resp.headers.get("Content-Type") or "").lower()
     if "image/" in ctype or "application/octet-stream" in ctype:
         mime = "image/webp" if "webp" in ctype else ("image/jpeg" if "jpeg" in ctype or "jpg" in ctype else "image/png")
@@ -541,7 +533,6 @@ def extract_image_from_response(resp):
 
 
 def resolve_adaptive_image_models(model_api_id, is_img2img):
-    """Seçilen modeli girdiye göre adaptif eşler ve blur/hata olmaması için sansürsüz yedek zinciri döndürür."""
     mid = (model_api_id or "").strip()
     if is_img2img:
         edit_map = {
@@ -560,13 +551,7 @@ def resolve_adaptive_image_models(model_api_id, is_img2img):
             "gpt-image-1-5": "gpt-image-1-5-edit",
         }
         primary = edit_map.get(mid, mid if "edit" in mid.lower() else "qwen-edit-uncensored")
-        candidates = [
-            primary,
-            "qwen-edit-uncensored",
-            "firered-image-edit",
-            "qwen-image-2-1-turbo-edit",
-            "flux-2-max-edit"
-        ]
+        candidates = [primary, "qwen-edit-uncensored", "firered-image-edit", "qwen-image-2-1-turbo-edit", "flux-2-max-edit"]
     else:
         txt_map = {
             "qwen-edit-uncensored": "lustify-sdxl",
@@ -584,14 +569,7 @@ def resolve_adaptive_image_models(model_api_id, is_img2img):
             primary = mid[:-5]
         else:
             primary = mid or "lustify-sdxl"
-        candidates = [
-            primary,
-            "lustify-sdxl",
-            "fluently-xl",
-            "venice-sd35",
-            "z-image-turbo",
-            "flux-2-max"
-        ]
+        candidates = [primary, "lustify-sdxl", "fluently-xl", "venice-sd35", "z-image-turbo", "flux-2-max"]
 
     seen = set()
     ordered = []
@@ -612,7 +590,6 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     last_error = ""
     fallback_blurred_url = None
 
-    # --- DURUM 1: GÖRSEL GİRDİSİ VAR -> IMG2IMG (/api/v1/image/edit) ---
     if is_img2img:
         edit_endpoints = []
         if endpoint and "venice.ai" not in endpoint:
@@ -627,7 +604,6 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
 
         for cand_model in candidate_models:
             for ep in edit_endpoints:
-                # 1) Multipart form-data denemesi (safe_mode=false ile, hata verirse safe_mode olmadan)
                 for form_payload in [
                     {"model": cand_model, "prompt": final_prompt, "aspect_ratio": "auto", "safe_mode": "false"},
                     {"model": cand_model, "prompt": final_prompt, "aspect_ratio": "auto"}
@@ -640,7 +616,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
                             if data_url:
                                 if is_response_blurred(r):
                                     fallback_blurred_url = data_url
-                                    break  # Bu model blur verdi, sıradaki sansürsüz modele geç
+                                    break
                                 return data_url, None
                         last_error = f"Venice Edit API ({r.status_code}): {r.text[:250]}"
                         if r.status_code == 404 or "safe_mode" not in r.text.lower():
@@ -649,7 +625,6 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
                         last_error = str(e)
                         break
 
-                # 2) JSON payload denemesi (safe_mode=False ile)
                 for json_payload in [
                     {"model": cand_model, "prompt": final_prompt, "image": full_data_url, "aspect_ratio": "auto", "safe_mode": False},
                     {"model": cand_model, "prompt": final_prompt, "image": full_data_url, "aspect_ratio": "auto"}
@@ -676,7 +651,6 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
             return fallback_blurred_url, None
         return None, last_error or "img2img görseli üretilemedi."
 
-    # --- DURUM 2: GÖRSEL GİRDİSİ YOK -> TXT2IMG (/api/v1/image/generate) ---
     target_endpoint = "https://api.venice.ai/api/v1/image/generate" if (not endpoint or "venice.ai" in endpoint) else endpoint
     json_headers = {"Authorization": headers.get("Authorization", ""), "Content-Type": "application/json"}
 
@@ -698,7 +672,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
                 if data_url:
                     if is_response_blurred(r):
                         fallback_blurred_url = data_url
-                        break  # Blur algılandı, sıradaki sansürsüz modele (lustify-sdxl / fluently-xl) geç
+                        break
                     return data_url, None
                 last_error = f"Beklenmeyen Görsel API yanıtı: {r.text[:200]}"
                 break
@@ -720,7 +694,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
             if "safe_mode" in err_lower and "safe_mode" in payload:
                 payload.pop("safe_mode", None)
                 continue
-            break  # Model desteklenmiyorsa sıradaki yedek modele geç
+            break
 
     if fallback_blurred_url:
         return fallback_blurred_url, None
@@ -728,7 +702,6 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
 
 
 def resolve_adaptive_video_models(model_api_id, has_media_input):
-    """Video modellerini girdi varlığına göre text-to-video / image-to-video arasında adaptif dönüştürür."""
     mid = (model_api_id or "").strip()
     if has_media_input:
         if mid.endswith("-text-to-video"):
@@ -739,13 +712,7 @@ def resolve_adaptive_video_models(model_api_id, has_media_input):
             primary = mid
         else:
             primary = "wan-2.5-preview-image-to-video"
-        candidates = [
-            primary,
-            "wan-2.5-preview-image-to-video",
-            "wan-2.1-pro-image-to-video",
-            "ltx-2-5-fast-image-to-video",
-            "pixverse-c1-image-to-video"
-        ]
+        candidates = [primary, "wan-2.5-preview-image-to-video", "wan-2.1-pro-image-to-video", "ltx-2-5-fast-image-to-video", "pixverse-c1-image-to-video"]
     else:
         if mid.endswith("-image-to-video"):
             primary = mid.replace("-image-to-video", "-text-to-video")
@@ -755,12 +722,7 @@ def resolve_adaptive_video_models(model_api_id, has_media_input):
             primary = mid
         else:
             primary = "wan-2.5-preview-text-to-video"
-        candidates = [
-            primary,
-            "wan-2.5-preview-text-to-video",
-            "ltx-2-5-fast-text-to-video",
-            "pixverse-c1-text-to-video"
-        ]
+        candidates = [primary, "wan-2.5-preview-text-to-video", "ltx-2-5-fast-text-to-video", "pixverse-c1-text-to-video"]
 
     seen = set()
     ordered = []
@@ -773,7 +735,6 @@ def resolve_adaptive_video_models(model_api_id, has_media_input):
 
 def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio, resolution="720p", source_media=None, strength=0.65):
     ar_clean = aspect_ratio if aspect_ratio in ["16:9", "9:16", "1:1"] else "16:9"
-
     queue_url = "https://api.venice.ai/api/v1/video/queue"
     retrieve_url = "https://api.venice.ai/api/v1/video/retrieve"
 
@@ -800,7 +761,6 @@ def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative
                 payload["video_url"] = full_data_url
             else:
                 payload["image_url"] = full_data_url
-            # Not: Venice AI image-to-video en-boy oranını görselden otomatik alır; aspect_ratio gönderilirse 400 verir.
         else:
             payload["aspect_ratio"] = ar_clean
 
@@ -857,8 +817,6 @@ def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative
                     return ("data:video/mp4;base64," + rj["video"]) if not rj["video"].startswith("http") else rj["video"], None
 
             last_error = f"Venice Video API Hatası ({r.status_code}): {r.text[:250]}"
-
-            # Zod / Validation hatalarında reddedilen alanları otomatik temizleyip tekrar dene
             try:
                 err_json = r.json()
                 removed = False
@@ -886,12 +844,10 @@ def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative
                 payload["duration"] = "6s" if payload["duration"] == "5s" else "4s"
                 continue
 
-            break  # Model desteklenmiyorsa sıradaki yedek video modeline geç
+            break
 
     return None, last_error or "Video üretilemedi."
 
-
-# --- SAYFA ROTALARI ---
 
 @app.route("/")
 def index():
@@ -905,8 +861,6 @@ def admin_page():
         return render_template("index.html")
     return render_template("admin.html")
 
-
-# --- AUTH & INIT API ---
 
 @app.route("/api/init", methods=["GET"])
 def api_init():
@@ -930,6 +884,8 @@ def api_init():
     active_models = [m for m in DB["models"] if m.get("active", True)]
     user_chats = [c for c in DB["chats"].values() if c.get("user") == uname]
     user_assistant_chats = [c for c in DB["assistant_chats"].values() if c.get("user") == uname]
+    
+    # Görseller için frontend'de önbellek kırma (?t=...) sağlanacak, burada db'den yolu okuyoruz.
     user_media = [
         m | {"preview_url": m["file_path"]}
         for m in DB.get("media", {}).values()
@@ -1022,8 +978,6 @@ def api_update_persona():
     save_db()
     return jsonify({"success": True})
 
-
-# --- KARAKTER & MODEL EĞİTME API ---
 
 @app.route("/api/characters", methods=["POST"])
 @login_required
@@ -1126,8 +1080,6 @@ def api_delete_trained_model(trn_id):
             return jsonify({"success": True})
     return jsonify({"error": "Bulunamadı."}), 404
 
-
-# --- AI ROLEPLAY SOHBET API ---
 
 @app.route("/api/rp/chats", methods=["POST"])
 @login_required
@@ -1267,7 +1219,6 @@ def api_send_rp_message(chat_id):
 @app.route("/api/rp/chats/<chat_id>/scene-image", methods=["POST"])
 @login_required
 def api_rp_generate_scene_image(chat_id):
-    """RP sohbeti içinde karakterin referans görselini kullanarak img2img sahne üretir."""
     user = get_current_user()
     chat = DB["chats"].get(chat_id)
     if not chat or chat["user"] != user["username"]:
@@ -1449,8 +1400,6 @@ def api_edit_or_delete_rp_message(chat_id, msg_id):
     return jsonify({"error": "Mesaj bulunamadı."}), 404
 
 
-# --- AI ASİSTAN SOHBET API ---
-
 @app.route("/api/assistant/send", methods=["POST"])
 @login_required
 def api_assistant_send():
@@ -1511,10 +1460,7 @@ def api_delete_assistant_chat(chat_id):
     return jsonify({"success": True})
 
 
-# --- ORTAK ODA (GLOBAL CHAT) & DM API ---
-
 def process_ai_commands_for_chat(content, room_list, user, room_type="global", target_user=None):
-    """Global Chat ve DM içindeki @txt, @img, @vid komutlarını işler."""
     if not (content.startswith("@txt ") or content.startswith("@img ") or content.startswith("@vid ")):
         return False
 
@@ -1757,8 +1703,6 @@ def api_dm_delete_message(target_user, msg_id):
     return jsonify({"success": True})
 
 
-# --- GÖRSEL & VİDEO ÜRETİM API (ADAPTİF TXT2IMG, IMG2IMG, TXT2VID, IMG2VID, VID2VID) ---
-
 @app.route("/api/media/generate", methods=["POST"])
 @login_required
 def api_generate_media():
@@ -1774,7 +1718,6 @@ def api_generate_media():
     source_media = (data.get("source_media") or "").strip()
     strength = float(data.get("strength") or 0.65)
 
-    # Girdi varlığına göre modu kesinleştir (Input yoksa txt2img/txt2vid, varsa img2img/img2vid)
     if media_type == "image":
         mode = "char_ref" if data.get("mode") == "char_ref" else ("img2img" if source_media else "txt2img")
     else:
@@ -1865,8 +1808,6 @@ def api_download_media(media_id):
         return "Dosya bulunamadı.", 404
     return send_file(filepath, as_attachment=True, download_name=filename)
 
-
-# --- ADMİN PANELİ YÖNETİM & JSON YEDEKLEME ---
 
 @app.route("/api/admin/state", methods=["GET"])
 @admin_required
@@ -2046,6 +1987,8 @@ def api_admin_export_media():
     return send_file(BytesIO(json.dumps(bundle, ensure_ascii=False, indent=2).encode("utf-8")), mimetype="application/json", as_attachment=True, download_name=f"nexus_media_{datetime.now().strftime('%Y%m%d_%H%M')}.json")
 
 
+# HATA ÇÖZÜMÜ 2: Medya import ederken file_path değerini doğru /static/media/ yoluna atıyor 
+# ve eksik olmasını engelliyor.
 @app.route("/api/admin/media/import", methods=["POST"])
 @admin_required
 def api_admin_import_media():
@@ -2067,8 +2010,8 @@ def api_admin_import_media():
                     with open(os.path.join(MEDIA_DIR, fname), "wb") as wf:
                         wf.write(base64.b64decode(b64_str))
                     entry["file_path"] = f"/static/media/{fname}"
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Medya yazma hatası: {e}")
             DB["media"][mid] = entry
             c += 1
         save_db_unlocked()
