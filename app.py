@@ -608,9 +608,9 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     is_img2img = bool(raw_b64)
     selected_model = (model_api_id or "").strip()
 
-    # 1. IMG2IMG / EDIT MODU (Resmi /api/v1/image/edit-image Endpoint'i Multipart)
+    # 1. IMG2IMG / EDIT MODU (Resmi /api/v1/image/edit Endpoint'i Multipart)
     if is_img2img:
-        edit_ep = "https://api.venice.ai/api/v1/image/edit-image"
+        edit_ep = "https://api.venice.ai/api/v1/image/edit"
         auth_headers = {"Authorization": headers.get("Authorization", "")}
         img_bytes = base64.b64decode(raw_b64)
         files_dict = {"image": ("input.png", img_bytes, "image/png")}
