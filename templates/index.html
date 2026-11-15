@@ -57,7 +57,7 @@
             </div>
             <div class="space-y-4">
                 <input id="authUser" type="text" placeholder="Kullanıcı Adı" class="w-full px-4 py-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 focus:border-purple-500 focus:outline-none transition">
-                <input id="authPass" type="password" placeholder="Şifre" class="w-full px-4 py-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 focus:border-purple-500 focus:outline-none transition">
+                <input id="authPass" type="password" placeholder="Şifre" onkeydown="if(event.key==='Enter') submitAuth('login')" class="w-full px-4 py-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 focus:border-purple-500 focus:outline-none transition">
                 <p id="authError" class="text-xs text-rose-400 hidden text-center"></p>
                 <div class="grid grid-cols-2 gap-3 pt-2">
                     <button onclick="submitAuth('login')" class="py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 font-bold text-sm transition shadow-lg shadow-purple-600/25">Giriş</button>
@@ -245,7 +245,7 @@
                 <div id="astMessagesBox" class="flex-1 min-h-0 overflow-y-auto p-4 lg:p-6 space-y-4"></div>
                 <div class="p-2.5 lg:p-3 input-dock flex items-center gap-2 shrink-0 z-20">
                     <input id="astInput" type="text" placeholder="Asistana istediğini sor..." onkeydown="if(event.key==='Enter') sendAssistantMessage()" class="flex-1 h-[44px] bg-[#0c0f19] border border-slate-700/80 rounded-2xl px-4 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500/40 focus:outline-none shadow-inner">
-                    <button onclick="sendAssistantMessage()" class="h-[44px] px-5 lg:px-6 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 active:scale-95 font-bold text-xs text-white shadow-lg shadow-purple-600/25 transition shrink-0">Gönder</button>
+                    <button onclick="sendAssistantMessage()" id="astSendBtn" class="h-[44px] px-5 lg:px-6 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 active:scale-95 font-bold text-xs text-white shadow-lg shadow-purple-600/25 transition shrink-0">Gönder</button>
                 </div>
             </div>
         </section>
@@ -426,6 +426,11 @@
                             </select>
                         </div>
                     </div>
+
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-1">Video LoRA / Stil</label>
+                        <select id="vidTrainedSelect" class="w-full bg-[#050609] border border-slate-800 rounded-xl p-3 text-xs focus:border-indigo-500 focus:outline-none"></select>
+                    </div>
                     
                     <button onclick="generateMedia('video')" id="btnGenVid" class="w-full py-3.5 mt-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:opacity-90 font-extrabold text-sm shadow-xl shadow-indigo-600/25 transition">🎬 Videoyu Üret</button>
                 </div>
@@ -566,6 +571,16 @@
             lastTouchEnd = now;
         }, { passive: false });
 
+        let STATE = {
+            user: null, users_directory: [], settings: {}, models: [], characters: [], trained_models: [],
+            chats: [], assistant_chats: [], media: [],
+            activeRpChat: null, activeAstChat: null, activeDmUser: null,
+            dmAttachmentBase64: "", avatarBase64: "", charRefBase64: "",
+            imgSourceMedia: "", vidSourceMedia: "", activeTab: "rp"
+        };
+        let globalPollInterval = null;
+        let dmPollInterval = null;
+
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', () => {
                 const isKeyboardOpen = window.visualViewport.height < window.innerHeight * 0.78;
@@ -590,15 +605,15 @@
             });
         }
 
-        let STATE = {
-            user: null, users_directory: [], settings: {}, models: [], characters: [], trained_models: [],
-            chats: [], assistant_chats: [], media: [],
-            activeRpChat: null, activeAstChat: null, activeDmUser: null,
-            dmAttachmentBase64: "", avatarBase64: "", charRefBase64: "",
-            imgSourceMedia: "", vidSourceMedia: "", activeTab: "rp"
-        };
-        let globalPollInterval = null;
-        let dmPollInterval = null;
+        function stripQueryParams(url) {
+            if (!url || typeof url !== "string" || url.startsWith("data:")) return url || "";
+            return url.split("?")[0].split("#")[0];
+        }
+
+        function escapeHtml(str) {
+            if (!str) return "";
+            return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
 
         function formatRpText(text) {
             if (!text) return "";
@@ -614,21 +629,23 @@
             if (!panelId) return;
             const panel = document.getElementById(panelId);
             const backdrop = document.getElementById("mobileDrawerBackdrop");
+            if (!panel) return;
             const isOpen = !panel.classList.contains("-translate-x-full");
             if (isOpen) closeMobileDrawer();
             else { panel.classList.remove("-translate-x-full"); backdrop.classList.remove("hidden"); }
         }
+
         function closeMobileDrawer() {
             ["rpSidebarPanel", "astSidebarPanel", "dmSidebarPanel"].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.add("-translate-x-full");
             });
-            document.getElementById("mobileDrawerBackdrop").classList.add("hidden");
+            const backdrop = document.getElementById("mobileDrawerBackdrop");
+            if (backdrop) backdrop.classList.add("hidden");
         }
 
         async function loadInit() {
             try {
-                // HATA ÇÖZÜMÜ 1: fetch için önbelleği engellemek amacıyla 'no-store' ve 'timestamp' eklendi.
                 const res = await fetch("/api/init?t=" + Date.now(), { cache: "no-store" });
                 const data = await res.json();
                 STATE.settings = data.settings || {};
@@ -670,11 +687,12 @@
                 if (!STATE.activeAstChat && STATE.assistant_chats.length > 0) selectAstChat(STATE.assistant_chats[0].id);
                 else renderAssistantMessages();
             } catch (err) {
-                console.error("Yükleme sırasında hata oluştu:", err);
+                console.error("Başlangıç verisi yüklenirken hata oluştu:", err);
             }
         }
 
         function renderHeader() {
+            if (!STATE.user) return;
             document.getElementById("userCredits").innerText = STATE.user.credits;
             document.getElementById("userCreditsMobile").innerText = STATE.user.credits;
             document.getElementById("userNameBadge").innerText = STATE.user.persona_name || STATE.user.username;
@@ -690,7 +708,7 @@
 
             const fill = (elId, list) => {
                 const el = document.getElementById(elId);
-                if (el) el.innerHTML = list.map(m => `<option value="${m.id}">${m.name} (-${m.cost}⚡)</option>`).join("");
+                if (el) el.innerHTML = list.map(m => `<option value="${m.id}">${escapeHtml(m.name)} (-${m.cost}⚡)</option>`).join("");
             };
             fill("rpModelSelect", chatModels);
             fill("astModelSelect", chatModels);
@@ -701,27 +719,34 @@
             const vidTrn = STATE.trained_models.filter(t => t.type === "video_lora");
             const memTrn = STATE.trained_models.filter(t => t.type === "memory_pack");
 
-            document.getElementById("imgTrainedSelect").innerHTML = `<option value="">-- LoRA Yok --</option>` + imgTrn.map(t => `<option value="${t.id}">${t.name}</option>`).join("");
-            document.getElementById("vidTrainedSelect").innerHTML = `<option value="">-- LoRA Yok --</option>` + vidTrn.map(t => `<option value="${t.id}">${t.name}</option>`).join("");
-            document.getElementById("cTrainedModel").innerHTML = `<option value="">-- Hafıza Yok --</option>` + memTrn.map(t => `<option value="${t.id}">${t.name}</option>`).join("");
+            const imgTrnEl = document.getElementById("imgTrainedSelect");
+            if (imgTrnEl) imgTrnEl.innerHTML = `<option value="">-- LoRA Yok --</option>` + imgTrn.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+
+            const vidTrnEl = document.getElementById("vidTrainedSelect");
+            if (vidTrnEl) vidTrnEl.innerHTML = `<option value="">-- LoRA Yok --</option>` + vidTrn.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+
+            const cTrnEl = document.getElementById("cTrainedModel");
+            if (cTrnEl) cTrnEl.innerHTML = `<option value="">-- Hafıza Yok --</option>` + memTrn.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
         }
 
-        function insertCommand(cmd, target="global") {
+        function insertCommand(cmd, target = "global") {
             const inputId = target === "dm" ? "dmInput" : "globalInput";
             const input = document.getElementById(inputId);
+            if (!input) return;
             input.value = cmd;
             input.focus();
         }
 
         function renderRpSidebar() {
+            if (!STATE.user) return;
             const myChars = STATE.characters.filter(c => c.creator === STATE.user.username);
             const communityChars = STATE.characters.filter(c => c.is_public && c.creator !== STATE.user.username);
             const buildCharList = (chars) => chars.map(c => `
                 <div onclick="startNewRpChat('${c.id}'); closeMobileDrawer();" class="glass-card p-2 rounded-2xl flex items-center gap-3 cursor-pointer hover:border-purple-500/50 hover:bg-white/5 transition">
                     <img src="${c.avatar}" class="w-10 h-10 rounded-xl object-cover shrink-0 border border-white/10">
                     <div class="min-w-0 flex-1">
-                        <h4 class="text-[11px] font-bold truncate text-white">${c.name}</h4>
-                        <p class="text-[9px] text-slate-400 truncate mt-0.5">${c.title || ''}</p>
+                        <h4 class="text-[11px] font-bold truncate text-white">${escapeHtml(c.name)}</h4>
+                        <p class="text-[9px] text-slate-400 truncate mt-0.5">${escapeHtml(c.title || '')}</p>
                     </div>
                 </div>
             `).join("");
@@ -729,16 +754,20 @@
             document.getElementById("rpCharListCommunity").innerHTML = buildCharList(communityChars) || `<p class="text-[10px] text-slate-500 italic px-2">Vitrin boş.</p>`;
             document.getElementById("rpChatList").innerHTML = STATE.chats.map(ch => `
                 <div class="flex items-center justify-between px-3 py-2 rounded-xl text-[11px] cursor-pointer font-semibold transition ${STATE.activeRpChat && STATE.activeRpChat.id === ch.id ? 'bg-purple-600/25 border border-purple-500/40 text-purple-100' : 'hover:bg-white/5 text-slate-400 hover:text-slate-200'}">
-                    <span onclick="selectRpChat('${ch.id}'); closeMobileDrawer();" class="truncate flex-1">${ch.title}</span>
+                    <span onclick="selectRpChat('${ch.id}'); closeMobileDrawer();" class="truncate flex-1">${escapeHtml(ch.title)}</span>
                     <button onclick="deleteRpChat('${ch.id}')" class="text-slate-500 hover:text-rose-400 ml-2">✕</button>
                 </div>
             `).join("");
         }
 
         async function startNewRpChat(charId) {
-            const res = await fetch("/api/rp/chats", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({character_id: charId}) });
-            const data = await res.json();
-            if (data.chat) { STATE.chats.unshift(data.chat); selectRpChat(data.chat.id); renderRpSidebar(); }
+            try {
+                const res = await fetch("/api/rp/chats", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({character_id: charId}) });
+                const data = await res.json();
+                if (data.chat) { STATE.chats.unshift(data.chat); selectRpChat(data.chat.id); renderRpSidebar(); }
+            } catch (e) {
+                alert("Sohbet başlatılamadı: " + e.message);
+            }
         }
 
         function selectRpChat(chatId) {
@@ -769,9 +798,7 @@
                 </div>`;
                 return;
             }
-            
-            // HATA ÇÖZÜMÜ 2: Görseller için cache buster kullan.
-            const timeStamp = Date.now();
+
             box.innerHTML = STATE.activeRpChat.messages.map(m => {
                 const isUser = m.role === "user";
                 const swipes = m.swipes || [m.content];
@@ -781,14 +808,15 @@
                         <span>${(m.active_swipe || 0) + 1}/${swipes.length}</span>
                         <button onclick="swipeRpMsg('${m.id}', 1)" class="hover:text-white">▶</button>
                     </div>` : "";
-                
-                const mediaHtml = m.media_url ? `<img src="${m.media_url}?t=${timeStamp}" onclick="openLightbox('${m.media_url}?t=${timeStamp}', 'image', '${m.media_id || ''}')" class="mt-2.5 rounded-xl max-h-72 w-full object-cover border border-pink-500/25 shadow-lg cursor-pointer transition hover:opacity-90">` : "";
+
+                const cleanUrl = stripQueryParams(m.media_url);
+                const mediaHtml = cleanUrl ? `<img src="${cleanUrl}" onclick="openLightbox('${cleanUrl}', 'image', '${m.media_id || ''}')" class="mt-2.5 rounded-xl max-h-72 w-full object-cover border border-pink-500/25 shadow-lg cursor-pointer transition hover:opacity-90">` : "";
 
                 return `
                 <div class="flex ${isUser ? 'justify-end' : 'justify-start'} group">
                     <div class="max-w-[88%] lg:max-w-2xl rounded-2xl p-3.5 ${isUser ? 'bg-gradient-to-br from-purple-900/55 to-indigo-900/45 border border-purple-500/35' : 'glass-card'} space-y-1.5 shadow-lg">
                         <div class="flex items-center justify-between gap-3 text-[10px] text-slate-400">
-                            <span class="font-extrabold tracking-wide ${isUser ? 'text-purple-300' : 'text-indigo-300'}">${isUser ? (STATE.user.persona_name || STATE.user.username) : STATE.activeRpChat.character_name}</span>
+                            <span class="font-extrabold tracking-wide ${isUser ? 'text-purple-300' : 'text-indigo-300'}">${escapeHtml(isUser ? (STATE.user.persona_name || STATE.user.username) : STATE.activeRpChat.character_name)}</span>
                             <div class="flex items-center gap-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
                                 ${swipeNav}
                                 <button onclick="editRpMsg('${m.id}')" class="hover:text-white transition" title="Düzenle">✏️</button>
@@ -810,21 +838,26 @@
             if (!STATE.activeRpChat) return alert("Önce bir karakter seçin!");
             const btn = document.getElementById("rpSceneBtn");
             btn.disabled = true; btn.innerText = "⏳";
-            const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/scene-image`, {
-                method: "POST", headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({
-                    prompt: document.getElementById("rpScenePrompt").value,
-                    strength: document.getElementById("rpSceneStrength").value,
-                    model_id: document.getElementById("imgModelSelect").value
-                })
-            });
-            const data = await res.json();
-            btn.disabled = false; btn.innerText = "✨ Çiz";
-            if (data.error) return alert(data.error);
-            document.getElementById("rpScenePrompt").value = "";
-            document.getElementById("rpSceneDrawer").classList.add("hidden");
-            if (data.media) { STATE.media.unshift(data.media); renderMediaGalleries(); }
-            updateChatInState(data.chat); STATE.user.credits = data.credits; renderHeader();
+            try {
+                const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/scene-image`, {
+                    method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        prompt: document.getElementById("rpScenePrompt").value,
+                        strength: document.getElementById("rpSceneStrength").value,
+                        model_id: document.getElementById("imgModelSelect").value
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) return alert(data.error || "Sahne görseli üretilemedi.");
+                document.getElementById("rpScenePrompt").value = "";
+                document.getElementById("rpSceneDrawer").classList.add("hidden");
+                if (data.media) { STATE.media.unshift(data.media); renderMediaGalleries(); }
+                updateChatInState(data.chat); STATE.user.credits = data.credits; renderHeader();
+            } catch (err) {
+                alert("Bağlantı hatası: " + err.message);
+            } finally {
+                btn.disabled = false; btn.innerText = "✨ Çiz";
+            }
         }
 
         async function sendRpMessage() {
@@ -835,23 +868,36 @@
             input.value = ""; input.style.height = '';
             const btn = document.getElementById("rpSendBtn");
             btn.disabled = true; btn.innerText = "⏳";
-            const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/message`, {
-                method: "POST", headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ content, model_id: document.getElementById("rpModelSelect").value })
-            });
-            const data = await res.json();
-            btn.disabled = false; btn.innerText = STATE.settings.ui_btn_send || "Gönder";
-            if (data.error) return alert(data.error);
-            updateChatInState(data.chat); STATE.user.credits = data.credits; renderHeader();
+            try {
+                const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/message`, {
+                    method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ content, model_id: document.getElementById("rpModelSelect").value })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) return alert(data.error || "Yanıt alınamadı.");
+                updateChatInState(data.chat); STATE.user.credits = data.credits; renderHeader();
+            } catch (err) {
+                alert("Mesaj gönderilirken hata oluştu: " + err.message);
+            } finally {
+                btn.disabled = false; btn.innerText = STATE.settings.ui_btn_send || "Gönder";
+            }
         }
 
         async function regenerateLastRp() {
             if (!STATE.activeRpChat) return;
-            const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/regenerate`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({model_id: document.getElementById("rpModelSelect").value}) });
-            const data = await res.json();
-            if (data.error) return alert(data.error);
-            updateChatInState(data.chat); STATE.user.credits = data.credits; renderHeader();
+            try {
+                const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/regenerate`, {
+                    method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({model_id: document.getElementById("rpModelSelect").value})
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) return alert(data.error || "Yeniden üretilemedi.");
+                updateChatInState(data.chat); STATE.user.credits = data.credits; renderHeader();
+            } catch (err) {
+                alert("Hata: " + err.message);
+            }
         }
+
         async function swipeRpMsg(msgId, dir) {
             const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/swipe`, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({msg_id: msgId, direction: dir}) });
             const data = await res.json(); if (data.chat) updateChatInState(data.chat);
@@ -890,7 +936,7 @@
         function renderAssistantSidebar() {
             document.getElementById("astChatList").innerHTML = STATE.assistant_chats.map(ch => `
                 <div class="flex items-center justify-between px-3 py-2 rounded-xl text-[11px] cursor-pointer font-semibold transition ${STATE.activeAstChat && STATE.activeAstChat.id === ch.id ? 'bg-purple-600/25 border border-purple-500/40 text-purple-100' : 'hover:bg-white/5 text-slate-400'}">
-                    <span onclick="selectAstChat('${ch.id}'); closeMobileDrawer();" class="truncate flex-1">${ch.title}</span>
+                    <span onclick="selectAstChat('${ch.id}'); closeMobileDrawer();" class="truncate flex-1">${escapeHtml(ch.title)}</span>
                     <button onclick="deleteAstChat('${ch.id}')" class="text-slate-500 hover:text-rose-400 ml-2">✕</button>
                 </div>
             `).join("");
@@ -918,44 +964,69 @@
             }
             box.innerHTML = STATE.activeAstChat.messages.map(m => `
                 <div class="flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}">
-                    <div class="max-w-[88%] lg:max-w-2xl rounded-2xl p-3.5 text-xs lg:text-[13px] leading-relaxed shadow-md ${m.role === 'user' ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white' : 'glass-card text-slate-200'} whitespace-pre-wrap">${m.content}</div>
+                    <div class="max-w-[88%] lg:max-w-2xl rounded-2xl p-3.5 text-xs lg:text-[13px] leading-relaxed shadow-md ${m.role === 'user' ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white' : 'glass-card text-slate-200'} whitespace-pre-wrap">${escapeHtml(m.content)}</div>
                 </div>`).join("");
             box.scrollTop = box.scrollHeight;
         }
         async function sendAssistantMessage() {
-            const input = document.getElementById("astInput"); const content = input.value.trim(); if (!content) return;
+            const input = document.getElementById("astInput");
+            const content = input.value.trim();
+            if (!content) return;
             input.value = "";
-            const res = await fetch("/api/assistant/send", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({chat_id: STATE.activeAstChat ? STATE.activeAstChat.id : null, content, model_id: document.getElementById("astModelSelect").value}) });
-            const data = await res.json(); if (data.error) return alert(data.error);
-            if (!STATE.activeAstChat && data.chat) STATE.assistant_chats.unshift(data.chat);
-            else { const idx = STATE.assistant_chats.findIndex(c => c.id === data.chat.id); if(idx > -1) STATE.assistant_chats[idx] = data.chat; }
-            STATE.activeAstChat = data.chat; STATE.user.credits = data.credits;
-            renderHeader(); renderAssistantSidebar(); renderAssistantMessages();
+            const btn = document.getElementById("astSendBtn");
+            if (btn) { btn.disabled = true; btn.innerText = "⏳"; }
+            try {
+                const res = await fetch("/api/assistant/send", {
+                    method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        chat_id: STATE.activeAstChat ? STATE.activeAstChat.id : null,
+                        content,
+                        model_id: document.getElementById("astModelSelect").value
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) return alert(data.error || "Asistan yanıt veremedi.");
+                if (!STATE.activeAstChat && data.chat) STATE.assistant_chats.unshift(data.chat);
+                else {
+                    const idx = STATE.assistant_chats.findIndex(c => c.id === data.chat.id);
+                    if (idx > -1) STATE.assistant_chats[idx] = data.chat;
+                }
+                STATE.activeAstChat = data.chat;
+                STATE.user.credits = data.credits;
+                renderHeader(); renderAssistantSidebar(); renderAssistantMessages();
+            } catch (err) {
+                alert("Bağlantı hatası: " + err.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = "Gönder"; }
+            }
         }
 
         async function loadGlobalChat() {
-            const res = await fetch("/api/global/sync"); const data = await res.json();
-            if (data.messages) {
-                const box = document.getElementById("globalMessagesBox");
-                const wasScrolledToBottom = box.scrollHeight - box.clientHeight <= box.scrollTop + 60;
-                const timeStamp = Date.now();
-                box.innerHTML = data.messages.map(m => {
-                    const isAi = (m.type === "ai_text");
-                    const canDel = STATE.user && (m.user === STATE.user.username || STATE.user.role === "admin");
-                    let cH = m.type === "image" ? `<img src="${m.file_path}?t=${timeStamp}" onclick="openLightbox('${m.file_path}?t=${timeStamp}', 'image', '${m.id}')" class="w-full sm:w-64 h-auto sm:h-64 object-cover rounded-xl mt-2 cursor-pointer border border-white/10 shadow-md">`
-                               : m.type === "video" ? `<video src="${m.file_path}?t=${timeStamp}" class="w-full sm:w-64 h-auto rounded-xl mt-2 border border-white/10 shadow-md" controls></video><button onclick="openLightbox('${m.file_path}?t=${timeStamp}', 'video', '${m.id}')" class="mt-1.5 text-[10px] bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 font-semibold shadow-inner">Tam Ekran</button>`
-                               : `<div class="whitespace-pre-wrap text-xs lg:text-[13px] leading-relaxed">${m.content}</div>`;
-                    return `<div class="flex flex-col bg-slate-900/75 p-3.5 rounded-2xl border ${isAi ? 'border-cyan-500/25 ml-5 shadow-lg shadow-cyan-500/5' : 'border-white/5'} shadow-sm">
-                        <div class="flex items-center justify-between mb-1.5">
-                            <div class="flex items-center gap-2">
-                                <span class="font-extrabold tracking-wide text-[10px] ${isAi ? 'text-cyan-400' : 'text-purple-300'}">${m.user}</span>
-                                <span class="text-[9px] text-slate-500 font-medium">${m.timestamp}</span>
-                            </div>
-                            ${canDel ? `<button onclick="deleteGlobalMessage('${m.id}')" class="text-[10px] text-slate-600 hover:text-rose-400 transition">✕</button>` : ''}
-                        </div>${cH}</div>`;
-                }).join("");
-                if (wasScrolledToBottom) box.scrollTop = box.scrollHeight;
-            }
+            try {
+                const res = await fetch("/api/global/sync");
+                const data = await res.json();
+                if (data.messages) {
+                    const box = document.getElementById("globalMessagesBox");
+                    const wasScrolledToBottom = box.scrollHeight - box.clientHeight <= box.scrollTop + 60;
+                    box.innerHTML = data.messages.map(m => {
+                        const isAi = (m.type === "ai_text");
+                        const canDel = STATE.user && (m.user === STATE.user.username || STATE.user.role === "admin");
+                        const cleanPath = stripQueryParams(m.file_path);
+                        let cH = m.type === "image" ? `<img src="${cleanPath}" onclick="openLightbox('${cleanPath}', 'image', '${m.id}')" class="w-full sm:w-64 h-auto sm:h-64 object-cover rounded-xl mt-2 cursor-pointer border border-white/10 shadow-md">`
+                                   : m.type === "video" ? `<video src="${cleanPath}" class="w-full sm:w-64 h-auto rounded-xl mt-2 border border-white/10 shadow-md" controls></video><button onclick="openLightbox('${cleanPath}', 'video', '${m.id}')" class="mt-1.5 text-[10px] bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 font-semibold shadow-inner">Tam Ekran</button>`
+                                   : `<div class="whitespace-pre-wrap text-xs lg:text-[13px] leading-relaxed">${escapeHtml(m.content)}</div>`;
+                        return `<div class="flex flex-col bg-slate-900/75 p-3.5 rounded-2xl border ${isAi ? 'border-cyan-500/25 ml-5 shadow-lg shadow-cyan-500/5' : 'border-white/5'} shadow-sm">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-extrabold tracking-wide text-[10px] ${isAi ? 'text-cyan-400' : 'text-purple-300'}">${escapeHtml(m.user)}</span>
+                                    <span class="text-[9px] text-slate-500 font-medium">${m.timestamp}</span>
+                                </div>
+                                ${canDel ? `<button onclick="deleteGlobalMessage('${m.id}')" class="text-[10px] text-slate-600 hover:text-rose-400 transition">✕</button>` : ''}
+                            </div>${cH}</div>`;
+                    }).join("");
+                    if (wasScrolledToBottom) box.scrollTop = box.scrollHeight;
+                }
+            } catch (e) {}
         }
         async function sendGlobalMessage() {
             const input = document.getElementById("globalInput"); const content = input.value.trim(); if (!content) return;
@@ -977,26 +1048,25 @@
             const box = document.getElementById("dmContactsList");
             if (!list.length) { box.innerHTML = `<p class="text-[10px] text-slate-500 italic p-2">Kullanıcı bulunamadı.</p>`; return; }
             box.innerHTML = list.map(u => {
-                if(u.username === STATE.user.username) return "";
-                const rkey = [STATE.user.username, u.username].sort().join("::");
-                const rm = STATE.dms && STATE.dms[rkey] ? STATE.dms[rkey] : [];
-                const lm = rm.length ? rm[rm.length-1] : null;
+                if (STATE.user && u.username === STATE.user.username) return "";
                 return `
                 <div onclick="selectDmUser('${u.username}'); closeMobileDrawer();" class="p-2.5 rounded-2xl cursor-pointer flex items-center justify-between transition ${STATE.activeDmUser === u.username ? 'bg-emerald-600/20 border border-emerald-500/30 text-white shadow-lg' : 'glass-card hover:bg-white/5'}">
                     <div class="min-w-0">
                         <div class="flex items-center gap-1.5">
-                            <span class="font-extrabold text-[11px] text-emerald-300 truncate">${u.persona_name}</span>
-                            <span class="text-[9px] text-slate-400">@${u.username}</span>
+                            <span class="font-extrabold text-[11px] text-emerald-300 truncate">${escapeHtml(u.persona_name)}</span>
+                            <span class="text-[9px] text-slate-400">@${escapeHtml(u.username)}</span>
                         </div>
-                        <p class="text-[9px] text-slate-400 truncate mt-1">${lm ? lm.content.substring(0,30) : 'Sohbet başlat'}</p>
+                        <p class="text-[9px] text-slate-400 truncate mt-1">${escapeHtml(u.last_message || 'Sohbet başlat')}</p>
                     </div>
                 </div>`;
             }).join("");
         }
         async function loadDmContacts() {
-            const res = await fetch("/api/dm/list"); const data = await res.json();
-            STATE.users_directory = data.contacts || [];
-            renderDmContacts(STATE.users_directory);
+            try {
+                const res = await fetch("/api/dm/list"); const data = await res.json();
+                STATE.users_directory = data.contacts || [];
+                renderDmContacts(STATE.users_directory);
+            } catch (e) {}
         }
         function selectDmUser(username) {
             STATE.activeDmUser = username;
@@ -1014,24 +1084,24 @@
             const res = await fetch(`/api/dm/${STATE.activeDmUser}`); const data = await res.json();
             const box = document.getElementById("dmMessagesBox");
             if (!data.messages || !data.messages.length) { box.innerHTML = `<div class="text-center text-slate-500 text-xs mt-20">İlk mesajı gönderin!</div>`; return; }
-            const timeStamp = Date.now();
             box.innerHTML = data.messages.map(m => {
                 const isMine = m.sender === STATE.user.username; const canDel = isMine || STATE.user.role === "admin";
                 const isAi = m.sender === "NEXUS AI";
-                let cH = m.media_url ? (m.media_url.includes(".mp4") 
-                            ? `<video src="${m.media_url}?t=${timeStamp}" class="mt-2 w-full max-w-xs rounded-xl shadow-md border border-white/10" controls></video>` 
-                            : `<img src="${m.media_url}?t=${timeStamp}" onclick="openLightbox('${m.media_url}?t=${timeStamp}', 'image', '')" class="mt-2 rounded-xl max-h-56 w-full object-cover cursor-pointer border border-white/10 shadow-md">`) : "";
+                const cleanMedia = stripQueryParams(m.media_url);
+                let cH = cleanMedia ? (cleanMedia.includes(".mp4") 
+                            ? `<video src="${cleanMedia}" class="mt-2 w-full max-w-xs rounded-xl shadow-md border border-white/10" controls></video>` 
+                            : `<img src="${cleanMedia}" onclick="openLightbox('${cleanMedia}', 'image', '')" class="mt-2 rounded-xl max-h-56 w-full object-cover cursor-pointer border border-white/10 shadow-md">`) : "";
                 
                 return `<div class="flex ${isMine ? 'justify-end' : (isAi ? 'justify-center' : 'justify-start')}">
                     <div class="max-w-[85%] lg:max-w-md rounded-2xl p-3.5 ${isMine ? 'bg-emerald-900/40 border border-emerald-500/30' : (isAi ? 'bg-indigo-900/40 border border-indigo-500/30 text-center' : 'glass-card')} space-y-1.5 shadow-md">
                         <div class="flex items-center justify-between gap-4 text-[9px] font-bold text-slate-400 tracking-wide uppercase">
-                            <span class="${isMine ? 'text-emerald-400' : (isAi ? 'text-indigo-300' : 'text-purple-300')}">${isAi ? 'AI Bot' : '@'+m.sender}</span>
+                            <span class="${isMine ? 'text-emerald-400' : (isAi ? 'text-indigo-300' : 'text-purple-300')}">${isAi ? 'AI Bot' : '@'+escapeHtml(m.sender)}</span>
                             <div class="flex items-center gap-2">
                                 <span>${m.timestamp}</span>
                                 ${canDel ? `<button onclick="deleteDmMessage('${m.id}')" class="hover:text-rose-400 transition" title="Sil">✕</button>` : ''}
                             </div>
                         </div>
-                        <div class="text-xs lg:text-[13px] leading-relaxed text-slate-200">${m.content}</div>
+                        <div class="text-xs lg:text-[13px] leading-relaxed text-slate-200">${escapeHtml(m.content)}</div>
                         ${cH}
                     </div></div>`;
             }).join("");
@@ -1055,24 +1125,29 @@
 
         function handleSourceFileUpload(input, tType) {
             const file = input.files[0]; if (!file) return;
-            const reader = new FileReader(); reader.onload = () => { setSourceMediaForStudio(tType, reader.result); }; reader.readAsDataURL(file);
+            const reader = new FileReader();
+            reader.onload = () => { setSourceMediaForStudio(tType, reader.result); };
+            reader.readAsDataURL(file);
         }
+
         function setSourceMediaForStudio(tType, urlOrData) {
+            const cleanSource = urlOrData.startsWith("data:") ? urlOrData : stripQueryParams(urlOrData);
             if (tType === "image") {
-                STATE.imgSourceMedia = urlOrData;
-                document.getElementById("imgSourcePreview").src = urlOrData;
+                STATE.imgSourceMedia = cleanSource;
+                document.getElementById("imgSourcePreview").src = cleanSource;
                 document.getElementById("imgSourcePreviewWrap").classList.replace("hidden", "flex");
                 document.getElementById("clearImgSourceBtn").classList.remove("hidden");
                 document.getElementById("imgModeBadge").innerText = "IMG2IMG";
             } else {
-                STATE.vidSourceMedia = urlOrData;
-                const isVid = urlOrData.endsWith(".mp4") || urlOrData.startsWith("data:video");
-                document.getElementById("vidSourceThumbBox").innerHTML = isVid ? "MP4" : `<img src="${urlOrData}" class="w-full h-full object-cover">`;
+                STATE.vidSourceMedia = cleanSource;
+                const isVid = cleanSource.endsWith(".mp4") || cleanSource.startsWith("data:video");
+                document.getElementById("vidSourceThumbBox").innerHTML = isVid ? "MP4" : `<img src="${cleanSource}" class="w-full h-full object-cover">`;
                 document.getElementById("vidSourcePreviewWrap").classList.replace("hidden", "flex");
                 document.getElementById("clearVidSourceBtn").classList.remove("hidden");
                 document.getElementById("vidModeBadge").innerText = isVid ? "VID2VID" : "IMG2VID";
             }
         }
+
         function clearSourceMedia(tType) {
             if (tType === "image") {
                 STATE.imgSourceMedia = ""; document.getElementById("imgSourceFile").value = "";
@@ -1086,86 +1161,128 @@
                 document.getElementById("vidModeBadge").innerText = "TXT2VID";
             }
         }
+
         function sendGalleryMediaToStudio(fileUrl, tStudio, promptText) {
-            switchTab(tStudio); setSourceMediaForStudio(tStudio, fileUrl);
+            switchTab(tStudio);
+            setSourceMediaForStudio(tStudio, stripQueryParams(fileUrl));
             if (promptText) document.getElementById(tStudio === "image" ? "imgPrompt" : "vidPrompt").value = promptText;
         }
 
         async function generateMedia(type) {
             const btn = document.getElementById(type === "image" ? "btnGenImg" : "btnGenVid");
-            const originalText = btn.innerText; btn.disabled = true; btn.innerText = "⏳ Üretiliyor...";
-            const sourceMedia = type === "image" ? STATE.imgSourceMedia : STATE.vidSourceMedia;
-            const str = document.getElementById(type === "image" ? "imgStrength" : "vidStrength").value;
-            let mode = type === "image" ? (sourceMedia ? "img2img" : "txt2img") : (sourceMedia ? (sourceMedia.includes("mp4") || sourceMedia.startsWith("data:video") ? "vid2vid" : "img2vid") : "txt2vid");
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "⏳ Üretiliyor...";
 
-            const payload = {
-                type, mode,
-                prompt: document.getElementById(type === "image" ? "imgPrompt" : "vidPrompt").value,
-                negative_prompt: type === "image" ? document.getElementById("imgNegPrompt").value : "",
-                aspect_ratio: type === "image" ? document.getElementById("imgRatio").value : "16:9",
-                resolution: type === "video" ? document.getElementById("vidResolution").value : "720p",
-                model_id: document.getElementById(type === "image" ? "imgModelSelect" : "vidModelSelect").value,
-                trained_id: document.getElementById(type === "image" ? "imgTrainedSelect" : "vidTrainedSelect").value,
-                source_media: sourceMedia, strength: parseFloat(str || 0.65)
-            };
-            const res = await fetch("/api/media/generate", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload) });
-            const data = await res.json(); btn.disabled = false; btn.innerText = originalText;
-            if (data.error) return alert(data.error);
-            STATE.media.unshift(data.media); STATE.user.credits = data.credits;
-            renderHeader(); renderMediaGalleries();
+            try {
+                const sourceMedia = type === "image" ? STATE.imgSourceMedia : STATE.vidSourceMedia;
+                const strEl = document.getElementById(type === "image" ? "imgStrength" : "vidStrength");
+                const str = strEl ? strEl.value : "0.65";
+                const trnEl = document.getElementById(type === "image" ? "imgTrainedSelect" : "vidTrainedSelect");
+                const trainedId = trnEl ? trnEl.value : "";
+
+                let mode = type === "image"
+                    ? (sourceMedia ? "img2img" : "txt2img")
+                    : (sourceMedia ? (sourceMedia.includes("mp4") || sourceMedia.startsWith("data:video") ? "vid2vid" : "img2vid") : "txt2vid");
+
+                const payload = {
+                    type, mode,
+                    prompt: document.getElementById(type === "image" ? "imgPrompt" : "vidPrompt").value,
+                    negative_prompt: type === "image" ? document.getElementById("imgNegPrompt").value : "",
+                    aspect_ratio: type === "image" ? document.getElementById("imgRatio").value : "16:9",
+                    resolution: type === "video" ? document.getElementById("vidResolution").value : "720p",
+                    model_id: document.getElementById(type === "image" ? "imgModelSelect" : "vidModelSelect").value,
+                    trained_id: trainedId,
+                    source_media: sourceMedia,
+                    strength: parseFloat(str || 0.65)
+                };
+
+                const res = await fetch("/api/media/generate", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    alert(data.error || "Medya üretimi sırasında bir hata oluştu.");
+                    return;
+                }
+                if (data.media) {
+                    STATE.media.unshift(data.media);
+                }
+                if (typeof data.credits !== "undefined") {
+                    STATE.user.credits = data.credits;
+                }
+                renderHeader();
+                renderMediaGalleries();
+            } catch (err) {
+                alert("Sunucu bağlantısı kesildi veya zaman aşımına uğradı: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
         }
 
         function renderMediaGalleries() {
-            const imgs = STATE.media.filter(m => m.type === "image" && m.mode !== "char_ref");
-            const vids = STATE.media.filter(m => m.type === "video");
+            const imgs = (STATE.media || []).filter(m => m && m.type === "image" && m.mode !== "char_ref");
+            const vids = (STATE.media || []).filter(m => m && m.type === "video");
 
-            const timeStamp = Date.now();
-
-            document.getElementById("imageGallery").innerHTML = imgs.map(m => `
-                <div class="glass-card rounded-[1.5rem] overflow-hidden flex flex-col group shadow-lg">
-                    <div class="relative w-full h-48 lg:h-56 cursor-pointer overflow-hidden" onclick="openLightbox('${m.preview_url}?t=${timeStamp}', 'image', '${m.id}')">
-                        <img src="${m.preview_url}?t=${timeStamp}" loading="lazy" class="w-full h-full object-cover bg-[#050609] transition-transform duration-500 group-hover:scale-105">
-                        <span class="absolute top-2 left-2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-[9px] font-extrabold tracking-widest uppercase text-pink-300 border border-white/10">${m.mode || 'img'}</span>
-                    </div>
-                    <div class="p-3.5 space-y-3 bg-gradient-to-b from-transparent to-[#0a0c14]">
-                        <p class="text-[11px] text-slate-300 truncate font-medium">${m.prompt}</p>
-                        <div class="flex items-center justify-between gap-1.5">
-                            <div class="flex gap-1.5">
-                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}?t=${timeStamp}', 'image', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-pink-600/30 border border-white/10 text-[9px] font-bold text-pink-300 uppercase tracking-widest transition">✏️ img2img</button>
-                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}?t=${timeStamp}', 'video', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600/30 border border-white/10 text-[9px] font-bold text-indigo-300 uppercase tracking-widest transition">🎬 img2vid</button>
-                            </div>
-                            <a href="/api/media/download/${m.id}" class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow-md">⬇</a>
+            const imgBox = document.getElementById("imageGallery");
+            if (imgBox) {
+                imgBox.innerHTML = imgs.map(m => {
+                    const cleanUrl = stripQueryParams(m.preview_url || m.file_path);
+                    return `
+                    <div class="glass-card rounded-[1.5rem] overflow-hidden flex flex-col group shadow-lg">
+                        <div class="relative w-full h-48 lg:h-56 cursor-pointer overflow-hidden" onclick="openLightbox('${cleanUrl}', 'image', '${m.id}')">
+                            <img src="${cleanUrl}" loading="lazy" class="w-full h-full object-cover bg-[#050609] transition-transform duration-500 group-hover:scale-105">
+                            <span class="absolute top-2 left-2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-[9px] font-extrabold tracking-widest uppercase text-pink-300 border border-white/10">${escapeHtml(m.mode || 'img')}</span>
                         </div>
-                    </div>
-                </div>
-            `).join("") || `<p class="text-xs text-slate-500">Görsel bulunamadı.</p>`;
-
-            document.getElementById("videoGallery").innerHTML = vids.map(m => `
-                <div class="glass-card rounded-[1.5rem] overflow-hidden flex flex-col group shadow-lg">
-                    <div class="relative w-full h-48 lg:h-56 bg-[#050609]">
-                        <video src="${m.preview_url}?t=${timeStamp}" controls preload="metadata" class="w-full h-full object-cover"></video>
-                        <span class="absolute top-2 left-2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-[9px] font-extrabold tracking-widest uppercase text-indigo-300 border border-white/10 z-10 pointer-events-none">${m.mode || 'vid'}</span>
-                    </div>
-                    <div class="p-3.5 space-y-3 bg-gradient-to-b from-transparent to-[#0a0c14]">
-                        <p class="text-[11px] text-slate-300 truncate font-medium">${m.prompt}</p>
-                        <div class="flex items-center justify-between gap-1.5">
-                            <div class="flex gap-1.5">
-                                <button onclick="sendGalleryMediaToStudio('${m.preview_url}?t=${timeStamp}', 'video', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600/30 border border-white/10 text-[9px] font-bold text-cyan-300 uppercase tracking-widest transition">🔄 vid2vid</button>
-                                <button onclick="openLightbox('${m.preview_url}?t=${timeStamp}', 'video', '${m.id}')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-[9px] font-bold text-slate-300 uppercase tracking-widest transition">🔍</button>
+                        <div class="p-3.5 space-y-3 bg-gradient-to-b from-transparent to-[#0a0c14]">
+                            <p class="text-[11px] text-slate-300 truncate font-medium" title="${escapeHtml(m.prompt)}">${escapeHtml(m.prompt)}</p>
+                            <div class="flex items-center justify-between gap-1.5">
+                                <div class="flex gap-1.5">
+                                    <button onclick="sendGalleryMediaToStudio('${cleanUrl}', 'image', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-pink-600/30 border border-white/10 text-[9px] font-bold text-pink-300 uppercase tracking-widest transition">✏️ img2img</button>
+                                    <button onclick="sendGalleryMediaToStudio('${cleanUrl}', 'video', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600/30 border border-white/10 text-[9px] font-bold text-indigo-300 uppercase tracking-widest transition">🎬 img2vid</button>
+                                </div>
+                                <a href="/api/media/download/${m.id}" class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow-md">⬇</a>
                             </div>
-                            <a href="/api/media/download/${m.id}" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-md">⬇</a>
                         </div>
-                    </div>
-                </div>
-            `).join("") || `<p class="text-xs text-slate-500">Video bulunamadı.</p>`;
+                    </div>`;
+                }).join("") || `<p class="text-xs text-slate-500">Henüz üretilmiş görsel bulunamadı.</p>`;
+            }
+
+            const vidBox = document.getElementById("videoGallery");
+            if (vidBox) {
+                vidBox.innerHTML = vids.map(m => {
+                    const cleanUrl = stripQueryParams(m.preview_url || m.file_path);
+                    return `
+                    <div class="glass-card rounded-[1.5rem] overflow-hidden flex flex-col group shadow-lg">
+                        <div class="relative w-full h-48 lg:h-56 bg-[#050609]">
+                            <video src="${cleanUrl}" controls preload="metadata" class="w-full h-full object-cover"></video>
+                            <span class="absolute top-2 left-2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-[9px] font-extrabold tracking-widest uppercase text-indigo-300 border border-white/10 z-10 pointer-events-none">${escapeHtml(m.mode || 'vid')}</span>
+                        </div>
+                        <div class="p-3.5 space-y-3 bg-gradient-to-b from-transparent to-[#0a0c14]">
+                            <p class="text-[11px] text-slate-300 truncate font-medium" title="${escapeHtml(m.prompt)}">${escapeHtml(m.prompt)}</p>
+                            <div class="flex items-center justify-between gap-1.5">
+                                <div class="flex gap-1.5">
+                                    <button onclick="sendGalleryMediaToStudio('${cleanUrl}', 'video', '')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600/30 border border-white/10 text-[9px] font-bold text-cyan-300 uppercase tracking-widest transition">🔄 vid2vid</button>
+                                    <button onclick="openLightbox('${cleanUrl}', 'video', '${m.id}')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 border border-white/10 text-[9px] font-bold text-slate-300 uppercase tracking-widest transition">🔍</button>
+                                </div>
+                                <a href="/api/media/download/${m.id}" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-md">⬇</a>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join("") || `<p class="text-xs text-slate-500">Henüz üretilmiş video bulunamadı.</p>`;
+            }
         }
 
         function openLightbox(url, type, id) {
             const modal = document.getElementById("lightbox");
+            const cleanUrl = stripQueryParams(url);
             document.getElementById("lightboxContent").innerHTML = type === "image" 
-                ? `<img src="${url}" class="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl">`
-                : `<video src="${url}" controls autoplay class="max-w-full max-h-[75vh] rounded-2xl shadow-2xl"></video>`;
-            document.getElementById("lightboxDownloadBtn").href = id ? `/api/media/download/${id}` : url;
+                ? `<img src="${cleanUrl}" class="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl">`
+                : `<video src="${cleanUrl}" controls autoplay class="max-w-full max-h-[75vh] rounded-2xl shadow-2xl"></video>`;
+            document.getElementById("lightboxDownloadBtn").href = id ? `/api/media/download/${id}` : cleanUrl;
             modal.classList.remove("hidden"); modal.classList.add("flex");
         }
         function closeLightbox() {
@@ -1192,16 +1309,31 @@
             const promptVal = document.getElementById("cRefPrompt").value.trim() || document.getElementById("cPersonality").value.trim();
             if (!promptVal) return alert("Referans promptu yazın!");
             const btn = document.getElementById("btnGenCharRef"); btn.disabled = true; btn.innerText = "⏳";
-            const res = await fetch("/api/media/generate", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ type: "image", mode: "char_ref", prompt: `character reference portrait, consistent face, plain background, ${promptVal}`, aspect_ratio: "1:1", model_id: document.getElementById("imgModelSelect").value }) });
-            const data = await res.json(); btn.disabled = false; btn.innerText = "✨ Üret";
-            if (data.error) return alert(data.error);
-            STATE.charRefBase64 = data.media.preview_url;
-            if (!STATE.avatarBase64 && !document.getElementById("cAvatarUrl").value.trim()) document.getElementById("cAvatarUrl").value = data.media.preview_url;
-            const prev = document.getElementById("cRefPreview"); prev.src = data.media.preview_url; prev.classList.remove("hidden");
-            document.getElementById("charRefStatus").innerText = "AI Çizdi ✓";
-            STATE.user.credits = data.credits; renderHeader();
+            try {
+                const res = await fetch("/api/media/generate", {
+                    method: "POST", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        type: "image", mode: "char_ref",
+                        prompt: `character reference portrait, consistent face, plain background, ${promptVal}`,
+                        aspect_ratio: "1:1",
+                        model_id: document.getElementById("imgModelSelect").value
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) return alert(data.error || "Referans görsel üretilemedi.");
+                STATE.charRefBase64 = data.media.preview_url;
+                if (!STATE.avatarBase64 && !document.getElementById("cAvatarUrl").value.trim()) document.getElementById("cAvatarUrl").value = data.media.preview_url;
+                const prev = document.getElementById("cRefPreview"); prev.src = data.media.preview_url; prev.classList.remove("hidden");
+                document.getElementById("charRefStatus").innerText = "AI Çizdi ✓";
+                STATE.user.credits = data.credits; renderHeader();
+            } catch (err) {
+                alert("Hata: " + err.message);
+            } finally {
+                btn.disabled = false; btn.innerText = "✨ Üret";
+            }
         }
         function renderStudio() {
+            if (!STATE.user) return;
             const myChars = STATE.characters.filter(c => c.creator === STATE.user.username).length;
             const myTrn = STATE.trained_models.filter(t => t.creator === STATE.user.username).length;
             document.getElementById("charQuotaBadge").innerText = `Kota: ${myChars}/${STATE.user.char_limit}`;
@@ -1209,8 +1341,8 @@
             document.getElementById("trainedModelsList").innerHTML = STATE.trained_models.map(t => `
                 <div class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#050609] border border-slate-800 text-[11px]">
                     <div class="min-w-0 flex-1">
-                        <span class="font-extrabold text-emerald-400 block truncate">${t.name}</span>
-                        <span class="text-[9px] text-slate-500 uppercase tracking-widest">${t.type}</span>
+                        <span class="font-extrabold text-emerald-400 block truncate">${escapeHtml(t.name)}</span>
+                        <span class="text-[9px] text-slate-500 uppercase tracking-widest">${escapeHtml(t.type)}</span>
                     </div>
                     <button onclick="deleteTrainedModel('${t.id}')" class="text-rose-400 hover:text-rose-300 font-bold ml-3 transition">Sil</button>
                 </div>
@@ -1219,14 +1351,36 @@
         async function createCharacter() {
             const avatarUrlVal = document.getElementById("cAvatarUrl").value.trim();
             const avatar = STATE.avatarBase64 || (avatarUrlVal !== "[Dosyadan Seçildi]" ? avatarUrlVal : "");
-            const res = await fetch("/api/characters", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ name: document.getElementById("cName").value, title: document.getElementById("cTitle").value, avatar, reference_image: STATE.charRefBase64 || avatar, personality: document.getElementById("cPersonality").value, scenario: document.getElementById("cScenario").value, first_message: document.getElementById("cFirstMsg").value, lorebook: document.getElementById("cLorebook").value, trained_model_id: document.getElementById("cTrainedModel").value, is_public: document.getElementById("cPublic").checked }) });
+            const res = await fetch("/api/characters", {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    name: document.getElementById("cName").value,
+                    title: document.getElementById("cTitle").value,
+                    avatar,
+                    reference_image: STATE.charRefBase64 || avatar,
+                    personality: document.getElementById("cPersonality").value,
+                    scenario: document.getElementById("cScenario").value,
+                    first_message: document.getElementById("cFirstMsg").value,
+                    lorebook: document.getElementById("cLorebook").value,
+                    trained_model_id: document.getElementById("cTrainedModel").value,
+                    is_public: document.getElementById("cPublic").checked
+                })
+            });
             const data = await res.json(); if (data.error) return alert(data.error);
             STATE.avatarBase64 = ""; STATE.charRefBase64 = "";
             document.getElementById("cRefPreview").classList.add("hidden"); document.getElementById("charRefStatus").innerText = "Seçilmedi";
             await loadInit(); switchTab("rp");
         }
         async function trainCustomModel() {
-            const res = await fetch("/api/trained-models", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ name: document.getElementById("tName").value, type: document.getElementById("tType").value, trigger_word: document.getElementById("tTrigger").value, training_data: document.getElementById("tData").value }) });
+            const res = await fetch("/api/trained-models", {
+                method: "POST", headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    name: document.getElementById("tName").value,
+                    type: document.getElementById("tType").value,
+                    trigger_word: document.getElementById("tTrigger").value,
+                    training_data: document.getElementById("tData").value
+                })
+            });
             const data = await res.json(); if (data.error) return alert(data.error);
             await loadInit(); alert("Model havuza eklendi!");
         }
@@ -1263,6 +1417,7 @@
 
             if (tab === 'global') { loadGlobalChat(); globalPollInterval = setInterval(loadGlobalChat, 3500); } 
             else if (tab === 'dm') { loadDmContacts(); loadDmMessages(); dmPollInterval = setInterval(loadDmMessages, 3500); }
+            else if (tab === 'image' || tab === 'video') { renderMediaGalleries(); }
         }
 
         async function submitAuth(mode) {
@@ -1285,7 +1440,6 @@
             closePersonaModal(); await loadInit();
         }
 
-        // HATA ÇÖZÜMÜ 1: İlk yüklemeyi DOM hazır olunca tetikle.
         document.addEventListener("DOMContentLoaded", () => {
             loadInit();
         });
