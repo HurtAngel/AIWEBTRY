@@ -608,7 +608,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     is_img2img = bool(raw_b64)
     selected_model = (model_api_id or "").strip()
 
-    # 1. IMG2IMG / EDIT MODU (Resmi /api/v1/image/edit Endpoint'i Multipart)
+    # 1. IMG2IMG / EDIT MODU (Resmi /api/v1/image/edit Endpoint'i Multipart + safe_mode false)
     if is_img2img:
         edit_ep = "https://api.venice.ai/api/v1/image/edit"
         auth_headers = {"Authorization": headers.get("Authorization", "")}
@@ -616,11 +616,15 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
         files_dict = {"image": ("input.png", img_bytes, "image/png")}
         form_data = {
             "model": selected_model or "qwen-image-2-1-turbo-edit",
-            "prompt": final_prompt
+            "prompt": final_prompt,
+            "safe_mode": "false"
         }
 
         try:
             r = requests.post(edit_ep, headers=auth_headers, data=form_data, files=files_dict, timeout=120)
+            if r.status_code == 400 and "safe_mode" in r.text.lower():
+                form_data.pop("safe_mode", None)
+                r = requests.post(edit_ep, headers=auth_headers, data=form_data, files=files_dict, timeout=120)
             if r.status_code == 200:
                 data_url = extract_image_from_response(r)
                 if data_url:
