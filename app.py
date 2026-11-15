@@ -251,7 +251,6 @@ def ensure_db_compatibility(loaded):
         if def_m["api_model_id"] not in existing_ids:
             loaded["models"].append(def_m)
 
-    # Mevcut medya kayıtlarındaki bozuk veya ?t= içeren yolları düzelt
     fixed_media = {}
     for mid, m in loaded.get("media", {}).items():
         if isinstance(m, dict) and m.get("file_path"):
@@ -263,10 +262,6 @@ def ensure_db_compatibility(loaded):
 
 
 def sync_disk_media_to_db():
-    """
-    static/media/ klasöründe fiziksel olarak bulunan ancak db.json'a yazılmamış
-    görsel veya videoları otomatik olarak DB['media'] içine kurtarır.
-    """
     if not os.path.exists(MEDIA_DIR):
         return False
 
@@ -605,7 +600,6 @@ def extract_image_from_response(resp):
 def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio, source_media=None, strength=0.65):
     """
     Venice.ai Resmi API Uyumlu Tekil Görsel Üretim Fonksiyonu.
-    Kullanıcının kredisini korumak için asla başka modellere döngüsel istek atmaz.
     """
     dim_map = {"1:1": (1024, 1024), "16:9": (1280, 720), "9:16": (720, 1280)}
     w, h = dim_map.get(aspect_ratio, (1024, 1024))
@@ -614,37 +608,19 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     is_img2img = bool(raw_b64)
     selected_model = (model_api_id or "").strip()
 
-    # 1. IMG2IMG / EDIT MODU (Resmi /api/v1/image/edit Endpoint'i)
+    # 1. IMG2IMG / EDIT MODU (Resmi /api/v1/image/edit-image Endpoint'i Multipart)
     if is_img2img:
-        edit_model_map = {
-            "lustify-sdxl": "qwen-edit-uncensored",
-            "lustify-v8": "qwen-edit-uncensored",
-            "fluently-xl": "qwen-edit-uncensored",
-            "venice-sd35": "qwen-edit-uncensored",
-            "seedream-v4.5": "qwen-edit-uncensored",
-        }
-        target_edit_model = edit_model_map.get(
-            selected_model,
-            selected_model if "edit" in selected_model.lower() else "qwen-edit-uncensored"
-        )
-        edit_ep = DB["settings"].get("image_edit_endpoint", "https://api.venice.ai/api/v1/image/edit")
-        if endpoint and "venice.ai" not in endpoint:
-            edit_ep = endpoint
-
-        json_headers = {
-            "Authorization": headers.get("Authorization", ""),
-            "Content-Type": "application/json"
-        }
-        edit_payload = {
-            "model": target_edit_model,
-            "prompt": final_prompt,
-            "image": full_data_url,
-            "aspect_ratio": "auto",
-            "safe_mode": False
+        edit_ep = "https://api.venice.ai/api/v1/image/edit-image"
+        auth_headers = {"Authorization": headers.get("Authorization", "")}
+        img_bytes = base64.b64decode(raw_b64)
+        files_dict = {"image": ("input.png", img_bytes, "image/png")}
+        form_data = {
+            "model": selected_model or "qwen-image-2-1-turbo-edit",
+            "prompt": final_prompt
         }
 
         try:
-            r = requests.post(edit_ep, headers=json_headers, json=edit_payload, timeout=120)
+            r = requests.post(edit_ep, headers=auth_headers, data=form_data, files=files_dict, timeout=120)
             if r.status_code == 200:
                 data_url = extract_image_from_response(r)
                 if data_url:
@@ -670,7 +646,6 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
         "Content-Type": "application/json"
     }
 
-    # Venice dokümantasyonuna göre piksel tabanlı modeller width/height, yeni nesil modeller aspect_ratio bekler
     pixel_based_models = {"lustify-sdxl", "lustify-v7", "lustify-v8", "fluently-xl", "venice-sd35", "z-image-turbo"}
     uses_pixels = target_txt_model in pixel_based_models
 
@@ -691,7 +666,6 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
 
     try:
         r = requests.post(gen_ep, headers=json_headers, json=payload, timeout=120)
-        # Eğer model boyut parametresi şemasını reddederse (HTTP 400), sadece şemayı düzeltip aynı modelle 1 kez tekrar dene
         if r.status_code == 400:
             err_lower = r.text.lower()
             retry_needed = False
