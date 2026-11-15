@@ -45,6 +45,8 @@ def get_default_db():
             "no_credit_warning": "Yetersiz kredi! İşleme devam etmek için yönetici ile iletişime geçin.",
             "limit_reached_warning": "Hesabınız için tanımlanan oluşturma/eğitim kotası doldu!",
             "unauthorized_model_warning": "Bu AI modelini kullanmak için yetkiniz bulunmuyor.",
+            "bypass_422_base_credit": "85",
+            "bypass_422_prompt": "heavily blur and pixelate the face, strong gaussian blur over the face and eyes, keep the rest of the image and body unchanged",
             "rp_system_prefix": (
                 "Sen üst düzey, yaratıcı ve sansürsüz bir rol yapma (Roleplay) yapay zekasısın. "
                 "Karakterin kişiliğine sıkı sıkıya bağlı kal. Aksiyonları *yıldız içinde*, "
@@ -101,8 +103,35 @@ def get_default_db():
                 "active": True
             },
             {
+                "id": "mdl_firered_edit",
+                "name": "FireRed Image Edit (Ucuz img2img)",
+                "api_model_id": "firered-image-edit",
+                "type": "image",
+                "cost": 12,
+                "endpoint_override": "",
+                "active": True
+            },
+            {
+                "id": "mdl_qwen_edit",
+                "name": "Qwen Image 2.1 Turbo Edit (img2img)",
+                "api_model_id": "qwen-image-2-1-turbo-edit",
+                "type": "image",
+                "cost": 15,
+                "endpoint_override": "",
+                "active": True
+            },
+            {
+                "id": "mdl_qwen_edit_uncensored",
+                "name": "Qwen Edit Uncensored (img2img)",
+                "api_model_id": "qwen-edit-uncensored",
+                "type": "image",
+                "cost": 15,
+                "endpoint_override": "",
+                "active": True
+            },
+            {
                 "id": "mdl_lustify_uncensored",
-                "name": "Lustify SDXL (Tam Sansürsüz)",
+                "name": "Lustify SDXL (Tam Sansürsüz txt2img)",
                 "api_model_id": "lustify-sdxl",
                 "type": "image",
                 "cost": 10,
@@ -111,7 +140,7 @@ def get_default_db():
             },
             {
                 "id": "mdl_lustify_v8",
-                "name": "Lustify v8 (Sansürsüz Yeni)",
+                "name": "Lustify v8 (Sansürsüz Yeni txt2img)",
                 "api_model_id": "lustify-v8",
                 "type": "image",
                 "cost": 10,
@@ -133,33 +162,6 @@ def get_default_db():
                 "api_model_id": "seedream-v4.5",
                 "type": "image",
                 "cost": 12,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_qwen_edit_uncensored",
-                "name": "Qwen Edit Uncensored (img2img)",
-                "api_model_id": "qwen-edit-uncensored",
-                "type": "image",
-                "cost": 15,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_firered_edit",
-                "name": "FireRed Image Edit (img2img)",
-                "api_model_id": "firered-image-edit",
-                "type": "image",
-                "cost": 12,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_qwen_edit",
-                "name": "Qwen Image 2.1 Turbo Edit",
-                "api_model_id": "qwen-image-2-1-turbo-edit",
-                "type": "image",
-                "cost": 15,
                 "endpoint_override": "",
                 "active": True
             },
@@ -213,7 +215,6 @@ DB = get_default_db()
 
 
 def clean_media_path(url_or_path):
-    """URL sonundaki ?t=123456 gibi önbellek kırıcı parametreleri temizler."""
     if not url_or_path or not isinstance(url_or_path, str):
         return ""
     if url_or_path.startswith("data:"):
@@ -285,6 +286,8 @@ def sync_disk_media_to_db():
 
         try:
             stat = os.stat(fpath)
+            if stat.st_size < 100:
+                continue
             size_kb = round(stat.st_size / 1024.0, 2)
             created_str = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
         except Exception:
@@ -376,26 +379,26 @@ def admin_required(f):
     return decorated
 
 
-def check_and_deduct_credit(user, model_obj):
+def check_and_deduct_credit(user, model_obj, extra_cost=0):
+    total_cost = int(model_obj.get("cost", 1)) + int(extra_cost)
     if user.get("role") == "admin":
-        return True, None
+        return True, None, total_cost
     allowed = user.get("allowed_models", ["*"])
     if "*" not in allowed and model_obj["id"] not in allowed and model_obj["api_model_id"] not in allowed:
-        return False, DB["settings"].get("unauthorized_model_warning", "Bu modele erişim yetkiniz yok.")
-    cost = int(model_obj.get("cost", 1))
+        return False, DB["settings"].get("unauthorized_model_warning", "Bu modele erişim yetkiniz yok."), 0
     current_credits = int(user.get("credits", 0))
-    if current_credits < cost:
-        return False, DB["settings"].get("no_credit_warning", "Krediniz yetersiz!")
-    user["credits"] = current_credits - cost
+    if current_credits < total_cost:
+        return False, DB["settings"].get("no_credit_warning", f"Yetersiz kredi! Gereken: {total_cost}⚡"), 0
+    user["credits"] = current_credits - total_cost
     save_db()
-    return True, None
+    return True, None, total_cost
 
 
-def refund_credit(user, model_obj):
+def refund_credit(user, model_obj, extra_cost=0):
     if user.get("role") == "admin":
         return
-    cost = int(model_obj.get("cost", 1))
-    user["credits"] = int(user.get("credits", 0)) + cost
+    total_cost = int(model_obj.get("cost", 1)) + int(extra_cost)
+    user["credits"] = int(user.get("credits", 0)) + total_cost
     save_db()
 
 
@@ -597,9 +600,54 @@ def extract_image_from_response(resp):
     return None
 
 
-def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio, source_media=None, strength=0.65):
+def execute_venice_edit_multipart(auth_header_val, model_api_id, prompt_text, raw_b64):
     """
-    Venice.ai Resmi API Uyumlu Tekil Görsel Üretim Fonksiyonu.
+    Venice /api/v1/image/edit uç noktasına resmi Multipart Form-Data isteği gönderir.
+    """
+    edit_ep = "https://api.venice.ai/api/v1/image/edit"
+    auth_headers = {"Authorization": auth_header_val}
+    img_bytes = base64.b64decode(raw_b64)
+    files_dict = {"image": ("input.png", img_bytes, "image/png")}
+    form_data = {
+        "model": model_api_id or "qwen-image-2-1-turbo-edit",
+        "prompt": prompt_text,
+        "safe_mode": "false"
+    }
+
+    try:
+        r = requests.post(edit_ep, headers=auth_headers, data=form_data, files=files_dict, timeout=120)
+        if r.status_code == 400 and "safe_mode" in r.text.lower():
+            form_data.pop("safe_mode", None)
+            files_retry = {"image": ("input.png", img_bytes, "image/png")}
+            r = requests.post(edit_ep, headers=auth_headers, data=form_data, files=files_retry, timeout=120)
+
+        if r.status_code == 200:
+            data_url = extract_image_from_response(r)
+            if data_url:
+                return data_url, None
+            return None, "Venice Edit API yanıtından görsel verisi okunamadı."
+        return None, f"Venice Edit API Hatası ({r.status_code}): {r.text[:300]}"
+    except Exception as e:
+        return None, f"Venice Edit Bağlantı Hatası: {str(e)}"
+
+
+def smart_generate_image(
+    endpoint,
+    headers,
+    model_api_id,
+    final_prompt,
+    negative_prompt,
+    aspect_ratio,
+    source_media=None,
+    strength=0.65,
+    bypass_422=False,
+    bypass_model_api_id="firered-image-edit"
+):
+    """
+    Venice.ai Resmi API Uyumlu Görsel Üretim Fonksiyonu.
+    bypass_422 aktifse:
+      Adım 1 -> Seçilen bypass modeliyle yüzü blurlar.
+      Adım 2 -> Blurlanmış görseli asıl model ve asıl prompt ile işler.
     """
     dim_map = {"1:1": (1024, 1024), "16:9": (1280, 720), "9:16": (720, 1280)}
     w, h = dim_map.get(aspect_ratio, (1024, 1024))
@@ -607,32 +655,37 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
     raw_b64, full_data_url = resolve_source_media_to_b64(source_media)
     is_img2img = bool(raw_b64)
     selected_model = (model_api_id or "").strip()
+    auth_val = headers.get("Authorization", "")
 
-    # 1. IMG2IMG / EDIT MODU (Resmi /api/v1/image/edit Endpoint'i Multipart + safe_mode false)
+    # 1. IMG2IMG / EDIT MODU
     if is_img2img:
-        edit_ep = "https://api.venice.ai/api/v1/image/edit"
-        auth_headers = {"Authorization": headers.get("Authorization", "")}
-        img_bytes = base64.b64decode(raw_b64)
-        files_dict = {"image": ("input.png", img_bytes, "image/png")}
-        form_data = {
-            "model": selected_model or "qwen-image-2-1-turbo-edit",
-            "prompt": final_prompt,
-            "safe_mode": "false"
-        }
+        working_b64 = raw_b64
 
-        try:
-            r = requests.post(edit_ep, headers=auth_headers, data=form_data, files=files_dict, timeout=120)
-            if r.status_code == 400 and "safe_mode" in r.text.lower():
-                form_data.pop("safe_mode", None)
-                r = requests.post(edit_ep, headers=auth_headers, data=form_data, files=files_dict, timeout=120)
-            if r.status_code == 200:
-                data_url = extract_image_from_response(r)
-                if data_url:
-                    return data_url, None
-                return None, "Venice Edit API yanıtından görsel verisi okunamadı."
-            return None, f"Venice Edit API Hatası ({r.status_code}): {r.text[:300]}"
-        except Exception as e:
-            return None, f"Venice Edit Bağlantı Hatası: {str(e)}"
+        # 422 ENGELLEYİCİ (ÖNCE YÜZÜ BLURLAMA ADIMI)
+        if bypass_422:
+            blur_prompt = DB["settings"].get(
+                "bypass_422_prompt",
+                "heavily blur and pixelate the face, strong gaussian blur over the face and eyes, keep the rest of the image and body unchanged"
+            )
+            step1_model = (bypass_model_api_id or "firered-image-edit").strip()
+            blurred_data_url, blur_err = execute_venice_edit_multipart(
+                auth_val, step1_model, blur_prompt, working_b64
+            )
+            if blur_err or not blurred_data_url:
+                return None, f"[422 Engelleyici 1. Adım (Yüz Blurlama) Hatası]: {blur_err}"
+
+            step1_b64, _ = resolve_source_media_to_b64(blurred_data_url)
+            if not step1_b64:
+                return None, "[422 Engelleyici Hatası]: Blurlanan ara görsel okunamadı."
+            working_b64 = step1_b64
+
+        # ASIL PROMPT VE ASIL MODEL ADIMI
+        return execute_venice_edit_multipart(
+            auth_val,
+            selected_model or "qwen-image-2-1-turbo-edit",
+            final_prompt,
+            working_b64
+        )
 
     # 2. TXT2IMG MODU (Resmi /api/v1/image/generate Endpoint'i)
     txt_model_map = {
@@ -646,7 +699,7 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
 
     gen_ep = "https://api.venice.ai/api/v1/image/generate" if (not endpoint or "venice.ai" in endpoint) else endpoint
     json_headers = {
-        "Authorization": headers.get("Authorization", ""),
+        "Authorization": auth_val,
         "Content-Type": "application/json"
     }
 
@@ -705,9 +758,6 @@ def smart_generate_image(endpoint, headers, model_api_id, final_prompt, negative
 
 
 def smart_generate_video(endpoint, headers, model_api_id, final_prompt, negative_prompt, aspect_ratio, resolution="720p", source_media=None, strength=0.65):
-    """
-    Venice.ai Video Queue/Retrieve Uyumlu Tekil Video Üretim Fonksiyonu.
-    """
     ar_clean = aspect_ratio if aspect_ratio in ["16:9", "9:16", "1:1"] else "16:9"
     queue_url = "https://api.venice.ai/api/v1/video/queue"
     retrieve_url = "https://api.venice.ai/api/v1/video/retrieve"
@@ -1146,7 +1196,7 @@ def api_send_rp_message(chat_id):
     if not model_obj:
         return jsonify({"error": "Aktif dil modeli bulunamadı."}), 400
 
-    ok, err = check_and_deduct_credit(user, model_obj)
+    ok, err, _ = check_and_deduct_credit(user, model_obj)
     if not ok:
         return jsonify({"error": err}), 403
 
@@ -1231,7 +1281,7 @@ def api_rp_generate_scene_image(chat_id):
     if not model_obj:
         return jsonify({"error": "Aktif görsel üretim modeli bulunamadı."}), 400
 
-    ok, err = check_and_deduct_credit(user, model_obj)
+    ok, err, _ = check_and_deduct_credit(user, model_obj)
     if not ok:
         return jsonify({"error": err}), 403
 
@@ -1324,7 +1374,7 @@ def api_regenerate_rp_message(chat_id):
         or next((m for m in DB["models"] if m["type"] == "chat" and m.get("active", True)), None)
     )
 
-    ok, err = check_and_deduct_credit(user, model_obj)
+    ok, err, _ = check_and_deduct_credit(user, model_obj)
     if not ok:
         return jsonify({"error": err}), 403
 
@@ -1418,7 +1468,7 @@ def api_assistant_send():
     if not model_obj:
         return jsonify({"error": "Aktif dil modeli bulunamadı."}), 400
 
-    ok, err = check_and_deduct_credit(user, model_obj)
+    ok, err, _ = check_and_deduct_credit(user, model_obj)
     if not ok:
         return jsonify({"error": err}), 403
 
@@ -1473,7 +1523,7 @@ def process_ai_commands_for_chat(content, room_list, user, room_type="global", t
 
     if content.startswith("@txt "):
         model_obj = next((m for m in DB["models"] if m["type"] == "chat" and m.get("active", True)), None)
-        ok, _ = check_and_deduct_credit(user, model_obj) if model_obj else (False, None)
+        ok, _, _ = check_and_deduct_credit(user, model_obj) if model_obj else (False, None, 0)
         if ok and model_obj:
             ctx = [{"role": "system", "content": "Sen sohbetteki bir AI asistansın. Odadaki kişiler [İsim]: mesaj şeklinde konuşur."}]
             for m in room_list[-15:]:
@@ -1501,7 +1551,7 @@ def process_ai_commands_for_chat(content, room_list, user, room_type="global", t
 
     elif content.startswith("@img "):
         model_obj = next((m for m in DB["models"] if m["type"] == "image" and m.get("active", True)), None)
-        ok, _ = check_and_deduct_credit(user, model_obj) if model_obj else (False, None)
+        ok, _, _ = check_and_deduct_credit(user, model_obj) if model_obj else (False, None, 0)
         if ok and model_obj:
             headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
             endpoint = model_obj.get("endpoint_override") or DB["settings"].get("image_endpoint", "https://api.venice.ai/api/v1/image/generate")
@@ -1533,7 +1583,7 @@ def process_ai_commands_for_chat(content, room_list, user, room_type="global", t
 
     elif content.startswith("@vid "):
         model_obj = next((m for m in DB["models"] if m["type"] == "video" and m.get("active", True)), None)
-        ok, _ = check_and_deduct_credit(user, model_obj) if model_obj else (False, None)
+        ok, _, _ = check_and_deduct_credit(user, model_obj) if model_obj else (False, None, 0)
         if ok and model_obj:
             headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
             endpoint = model_obj.get("endpoint_override") or DB["settings"].get("video_endpoint", "https://api.venice.ai/api/v1/video/queue")
@@ -1719,11 +1769,21 @@ def api_generate_media():
     resolution = data.get("resolution", "720p")
     model_id = data.get("model_id")
     trained_id = data.get("trained_id", "")
-    source_media = clean_media_path(data.get("source_media") or "") if not str(data.get("source_media") or "").startswith("data:") else (data.get("source_media") or "").strip()
+    raw_source = data.get("source_media") or ""
+    source_media = clean_media_path(raw_source) if not str(raw_source).startswith("data:") else str(raw_source).strip()
     strength = float(data.get("strength") or 0.65)
 
+    # 422 Engelleyici parametreleri
+    bypass_422 = bool(data.get("bypass_422", False)) and bool(source_media) and (media_type == "image")
+    bypass_model_id = (data.get("bypass_model_id") or "").strip()
+
     if media_type == "image":
-        mode = "char_ref" if data.get("mode") == "char_ref" else ("img2img" if source_media else "txt2img")
+        if data.get("mode") == "char_ref":
+            mode = "char_ref"
+        elif source_media:
+            mode = "img2img_422_bypass" if bypass_422 else "img2img"
+        else:
+            mode = "txt2img"
     else:
         if source_media:
             mode = "vid2vid" if ("mp4" in source_media[:40].lower() or source_media.startswith("data:video")) else "img2vid"
@@ -1740,7 +1800,20 @@ def api_generate_media():
     if not model_obj:
         return jsonify({"error": f"Aktif bir {media_type} modeli bulunamadı."}), 400
 
-    ok, err = check_and_deduct_credit(user, model_obj)
+    # 422 Engelleyici seçiliyse engelleyici modeli ve ekstra kredi maliyetini belirle
+    extra_bypass_cost = 0
+    bypass_api_model_id = "firered-image-edit"
+    if bypass_422:
+        bypass_model_obj = (
+            next((m for m in DB["models"] if m["id"] == bypass_model_id and m["type"] == "image"), None)
+            or next((m for m in DB["models"] if m.get("api_model_id") == "firered-image-edit"), None)
+            or model_obj
+        )
+        bypass_api_model_id = bypass_model_obj.get("api_model_id", "firered-image-edit")
+        base_bypass_fee = int(DB["settings"].get("bypass_422_base_credit", 85))
+        extra_bypass_cost = base_bypass_fee + int(bypass_model_obj.get("cost", 15))
+
+    ok, err, _ = check_and_deduct_credit(user, model_obj, extra_cost=extra_bypass_cost)
     if not ok:
         return jsonify({"error": err}), 403
 
@@ -1752,7 +1825,7 @@ def api_generate_media():
 
     api_key = (DB["settings"].get("venice_api_key") or os.getenv("VENICE_API_KEY", "")).strip()
     if not api_key:
-        refund_credit(user, model_obj)
+        refund_credit(user, model_obj, extra_cost=extra_bypass_cost)
         return jsonify({"error": "Venice API Anahtarı bulunamadı!"}), 400
 
     endpoint = model_obj.get("endpoint_override") or (
@@ -1765,28 +1838,41 @@ def api_generate_media():
     try:
         if media_type == "image":
             data_url, api_err = smart_generate_image(
-                endpoint, headers, model_obj["api_model_id"],
-                final_prompt, negative_prompt, aspect_ratio,
-                source_media=source_media, strength=strength
+                endpoint,
+                headers,
+                model_obj["api_model_id"],
+                final_prompt,
+                negative_prompt,
+                aspect_ratio,
+                source_media=source_media,
+                strength=strength,
+                bypass_422=bypass_422,
+                bypass_model_api_id=bypass_api_model_id
             )
         else:
             data_url, api_err = smart_generate_video(
-                endpoint, headers, model_obj["api_model_id"],
-                final_prompt, negative_prompt, aspect_ratio,
-                resolution=resolution, source_media=source_media, strength=strength
+                endpoint,
+                headers,
+                model_obj["api_model_id"],
+                final_prompt,
+                negative_prompt,
+                aspect_ratio,
+                resolution=resolution,
+                source_media=source_media,
+                strength=strength
             )
 
         if api_err or not data_url:
-            refund_credit(user, model_obj)
+            refund_credit(user, model_obj, extra_cost=extra_bypass_cost)
             return jsonify({"error": api_err or "Medya üretilemedi, krediniz iade edildi."}), 400
     except Exception as e:
-        refund_credit(user, model_obj)
+        refund_credit(user, model_obj, extra_cost=extra_bypass_cost)
         return jsonify({"error": f"API Bağlantı Hatası: {str(e)}"}), 500
 
     try:
         media_id, public_url, size_kb = save_media_file_helper(data_url, media_type)
     except Exception as e:
-        refund_credit(user, model_obj)
+        refund_credit(user, model_obj, extra_cost=extra_bypass_cost)
         return jsonify({"error": f"Dosya kayıt hatası: {str(e)}"}), 500
 
     media_item = {
