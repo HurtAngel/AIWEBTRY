@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@neon/config": "^1.14.6",
+    "@neon/env": "^2.1.9",
+    "@neon/realtime": "^0.2.1",
+    "dotenv": "^18.0.10",
+    "pg": "^8.23.1"
+  }
+}

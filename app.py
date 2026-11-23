@@ -18,6 +18,7 @@ except ImportError:
     psycopg2 = None
 
 load_dotenv()
+load_dotenv(".env.local", override=False)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "nexus-ai-rp-studio-secret-key-2026")
@@ -181,23 +182,7 @@ def get_default_db():
                 "active": True
             }
         ],
-        "characters": [
-            {
-                "id": "char_seraphina",
-                "creator": "Admin",
-                "name": "Seraphina Vale",
-                "title": "Gece Loncası Suikastçısı",
-                "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
-                "reference_image": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
-                "personality": "Soğukkanlı, alaycı, zeki ama güvendiği kişilere karşı gizlice korumacı. Hançer kullanmakta usta.",
-                "scenario": "Yağmurlu bir gecede Neo-Veridia şehrinin karanlık bir hanında karşılaşırsınız. Seraphina masada tek başına oturmuş hançerini temizlemektedir.",
-                "first_message": "*Yağmur damlaları hanın buğulu camlarına vururken, Seraphina kapının açılmasıyla bakışlarını elindeki gümüş hançerden kaldırır. Zümrüt yeşili gözleri seni tepeden tırnağa süzer ve dudaklarında hafif, tehlikeli bir tebessüm belirir.* \"Beni bulmak için yanlış gecede, yanlış mahalledesin yabancı. Söyle bakalım, seni buraya getiren cesaret mi yoksa aptallık mı?\"",
-                "lorebook": "Neo-Veridia: Büyü ve siber teknolojinin birleştiği karanlık metropol. Gece Loncası: Şehrin yeraltı suikast örgütü.",
-                "trained_model_id": "",
-                "is_public": True,
-                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
-            }
-        ],
+        "characters": [],
         "trained_models": [
             {
                 "id": "trn_default_cyber",
