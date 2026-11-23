@@ -9,8 +9,13 @@ import requests
 from datetime import datetime
 from functools import wraps
 from io import BytesIO
-from flask import Flask, render_template, request, jsonify, session, send_file
+from flask import Flask, render_template, request, jsonify, session, send_file, Response
 from dotenv import load_dotenv
+
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
 
 load_dotenv()
 
@@ -20,6 +25,7 @@ app.secret_key = os.getenv("SECRET_KEY", "nexus-ai-rp-studio-secret-key-2026")
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_FILE = os.path.join(BASE_DIR, "db.json")
 MEDIA_DIR = os.path.join(BASE_DIR, "static", "media")
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
 db_lock = threading.RLock()
@@ -317,14 +323,109 @@ def sync_disk_media_to_db():
     return changed
 
 
+_pg_initialized = False
+
+
+def get_pg_conn():
+    global _pg_initialized
+    if not DATABASE_URL or psycopg2 is None:
+        return None
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        if not _pg_initialized:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS app_state (
+                        id TEXT PRIMARY KEY,
+                        data TEXT NOT NULL,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS media_blobs (
+                        filename TEXT PRIMARY KEY,
+                        mime_type TEXT NOT NULL,
+                        data BYTEA NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+            conn.commit()
+            _pg_initialized = True
+        return conn
+    except Exception as e:
+        print(f"[PG BAĞLANTI HATASI]: {e}")
+        return None
+
+
+def save_media_blob_to_pg(filename, mime_type, raw_bytes):
+    conn = get_pg_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO media_blobs (filename, mime_type, data)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (filename) DO UPDATE SET
+                    mime_type = EXCLUDED.mime_type,
+                    data = EXCLUDED.data;
+                """,
+                (filename, mime_type, psycopg2.Binary(raw_bytes))
+            )
+        conn.commit()
+    except Exception as e:
+        print(f"[PG MEDIA KAYIT HATASI]: {e}")
+    finally:
+        conn.close()
+
+
+def get_media_blob_from_pg(filename):
+    conn = get_pg_conn()
+    if not conn:
+        return None, None
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT mime_type, data FROM media_blobs WHERE filename = %s;", (filename,))
+            row = cur.fetchone()
+            if row:
+                return row[0], bytes(row[1])
+    except Exception as e:
+        print(f"[PG MEDIA OKUMA HATASI]: {e}")
+    finally:
+        conn.close()
+    return None, None
+
+
 def save_db_unlocked():
+    payload_str = json.dumps(DB, ensure_ascii=False, indent=2)
     try:
         tmp_file = DB_FILE + ".tmp"
         with open(tmp_file, "w", encoding="utf-8") as f:
-            json.dump(DB, f, ensure_ascii=False, indent=2)
+            f.write(payload_str)
         os.replace(tmp_file, DB_FILE)
     except Exception as e:
         print(f"[DB KAYIT HATASI]: {e}")
+
+    conn = get_pg_conn()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO app_state (id, data, updated_at)
+                    VALUES ('main', %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (id) DO UPDATE SET
+                        data = EXCLUDED.data,
+                        updated_at = CURRENT_TIMESTAMP;
+                    """,
+                    (payload_str,)
+                )
+            conn.commit()
+        except Exception as e:
+            print(f"[PG DB KAYIT HATASI]: {e}")
+        finally:
+            conn.close()
 
 
 def save_db():
@@ -335,15 +436,32 @@ def save_db():
 def load_db():
     global DB
     with db_lock:
-        if os.path.exists(DB_FILE):
+        loaded_from_pg = False
+        conn = get_pg_conn()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT data FROM app_state WHERE id = 'main';")
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        loaded = json.loads(row[0])
+                        DB = ensure_db_compatibility(loaded)
+                        loaded_from_pg = True
+            except Exception as e:
+                print(f"[PG DB YÜKLEME HATASI]: {e}")
+            finally:
+                conn.close()
+
+        if not loaded_from_pg and os.path.exists(DB_FILE):
             try:
                 with open(DB_FILE, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
                     DB = ensure_db_compatibility(loaded)
             except Exception as e:
                 print(f"[DB YÜKLEME HATASI]: {e}")
+
         recovered = sync_disk_media_to_db()
-        if recovered or not os.path.exists(DB_FILE):
+        if recovered or not loaded_from_pg or not os.path.exists(DB_FILE):
             save_db_unlocked()
 
 
@@ -430,9 +548,16 @@ def save_media_file_helper(data_url, media_type):
             ext = "mp4"
     elif clean_media_path(data_url).startswith("/static/media/"):
         clean_path = clean_media_path(data_url)
-        local_path = os.path.join(MEDIA_DIR, os.path.basename(clean_path))
-        with open(local_path, "rb") as lf:
-            raw_bytes = lf.read()
+        fname_only = os.path.basename(clean_path)
+        local_path = os.path.join(MEDIA_DIR, fname_only)
+        if os.path.exists(local_path):
+            with open(local_path, "rb") as lf:
+                raw_bytes = lf.read()
+        else:
+            _, pg_bytes = get_media_blob_from_pg(fname_only)
+            if not pg_bytes:
+                raise FileNotFoundError(f"Medya bulunamadı: {fname_only}")
+            raw_bytes = pg_bytes
         if local_path.endswith(".mp4"):
             ext = "mp4"
         elif local_path.endswith((".jpg", ".jpeg")):
@@ -455,6 +580,9 @@ def save_media_file_helper(data_url, media_type):
     filepath = os.path.join(MEDIA_DIR, filename)
     with open(filepath, "wb") as f:
         f.write(raw_bytes)
+
+    mime_map = {"mp4": "video/mp4", "jpg": "image/jpeg", "webp": "image/webp", "png": "image/png"}
+    save_media_blob_to_pg(filename, mime_map.get(ext, "application/octet-stream"), raw_bytes)
 
     size_kb = round(len(raw_bytes) / 1024.0, 2)
     public_url = f"/static/media/{filename}"
@@ -631,6 +759,44 @@ def execute_venice_edit_multipart(auth_header_val, model_api_id, prompt_text, ra
         return None, f"Venice Edit Bağlantı Hatası: {str(e)}"
 
 
+def execute_venice_multi_edit_multipart(auth_header_val, model_api_id, prompt_text, b64_list):
+    """
+    Venice /api/v1/image/multi-edit uç noktasına birden fazla görseli Multipart Form-Data olarak gönderir.
+    Venice dokümantasyonuna göre:
+      - Alan adı: 'images' (birden fazla part aynı isimle)
+      - Model alanı: 'modelId' (multi-edit sadece modelId kabul eder)
+    """
+    multi_ep = "https://api.venice.ai/api/v1/image/multi-edit"
+    auth_headers = {"Authorization": auth_header_val}
+    files_list = [
+        ("images", (f"input_{idx}.png", base64.b64decode(b64), "image/png"))
+        for idx, b64 in enumerate(b64_list)
+    ]
+    form_data = {
+        "modelId": model_api_id or "firered-image-edit",
+        "prompt": prompt_text,
+        "safe_mode": "false"
+    }
+    try:
+        r = requests.post(multi_ep, headers=auth_headers, data=form_data, files=files_list, timeout=120)
+        if r.status_code == 400 and "safe_mode" in r.text.lower():
+            form_data.pop("safe_mode", None)
+            files_retry = [
+                ("images", (f"input_{idx}.png", base64.b64decode(b64), "image/png"))
+                for idx, b64 in enumerate(b64_list)
+            ]
+            r = requests.post(multi_ep, headers=auth_headers, data=form_data, files=files_retry, timeout=120)
+
+        if r.status_code == 200:
+            data_url = extract_image_from_response(r)
+            if data_url:
+                return data_url, None
+            return None, "Venice Multi-Edit API yanıtından görsel verisi okunamadı."
+        return None, f"Venice Multi-Edit API Hatası ({r.status_code}): {r.text[:300]}"
+    except Exception as e:
+        return None, f"Venice Multi-Edit Bağlantı Hatası: {str(e)}"
+
+
 def smart_generate_image(
     endpoint,
     headers,
@@ -641,7 +807,8 @@ def smart_generate_image(
     source_media=None,
     strength=0.65,
     bypass_422=False,
-    bypass_model_api_id="firered-image-edit"
+    bypass_model_api_id="firered-image-edit",
+    source_images=None
 ):
     """
     Venice.ai Resmi API Uyumlu Görsel Üretim Fonksiyonu.
@@ -652,14 +819,24 @@ def smart_generate_image(
     dim_map = {"1:1": (1024, 1024), "16:9": (1280, 720), "9:16": (720, 1280)}
     w, h = dim_map.get(aspect_ratio, (1024, 1024))
 
+    b64_list = []
+    if source_images and isinstance(source_images, list):
+        for sm in source_images:
+            b64_item, _ = resolve_source_media_to_b64(sm)
+            if b64_item:
+                b64_list.append(b64_item)
+
     raw_b64, full_data_url = resolve_source_media_to_b64(source_media)
-    is_img2img = bool(raw_b64)
+    if raw_b64 and not b64_list:
+        b64_list.append(raw_b64)
+
+    is_img2img = len(b64_list) > 0
     selected_model = (model_api_id or "").strip()
     auth_val = headers.get("Authorization", "")
 
     # 1. IMG2IMG / EDIT MODU
     if is_img2img:
-        working_b64 = raw_b64
+        working_b64 = b64_list[0]
 
         # 422 ENGELLEYİCİ (ÖNCE YÜZÜ BLURLAMA ADIMI)
         if bypass_422:
@@ -678,8 +855,17 @@ def smart_generate_image(
             if not step1_b64:
                 return None, "[422 Engelleyici Hatası]: Blurlanan ara görsel okunamadı."
             working_b64 = step1_b64
+            b64_list[0] = working_b64
 
-        # ASIL PROMPT VE ASIL MODEL ADIMI
+        if len(b64_list) > 1:
+            return execute_venice_multi_edit_multipart(
+                auth_val,
+                selected_model or "firered-image-edit",
+                final_prompt,
+                b64_list
+            )
+
+        # ASIL PROMPT VE ASIL MODEL ADIMI (Tek görsel)
         return execute_venice_edit_multipart(
             auth_val,
             selected_model or "qwen-image-2-1-turbo-edit",
@@ -1040,6 +1226,54 @@ def api_create_character():
     DB["characters"].append(new_char)
     save_db()
     return jsonify({"success": True, "character": new_char})
+
+
+@app.route("/api/characters/<char_id>", methods=["PUT"])
+@login_required
+def api_update_character(char_id):
+    user = get_current_user()
+    data = request.json or {}
+    for c in DB["characters"]:
+        if c["id"] == char_id:
+            if user.get("role") != "admin" and c.get("creator") != user["username"]:
+                return jsonify({"error": "Bu karakteri düzenleme yetkiniz yok."}), 403
+            if "name" in data and (data.get("name") or "").strip():
+                c["name"] = data["name"].strip()
+            if "title" in data:
+                c["title"] = (data.get("title") or "Özel Karakter").strip()
+            if "personality" in data:
+                c["personality"] = (data.get("personality") or "").strip()
+            if "scenario" in data:
+                c["scenario"] = (data.get("scenario") or "").strip()
+            if "first_message" in data:
+                c["first_message"] = (data.get("first_message") or "").strip()
+            if "lorebook" in data:
+                c["lorebook"] = (data.get("lorebook") or "").strip()
+            if "trained_model_id" in data:
+                c["trained_model_id"] = data.get("trained_model_id") or ""
+            if "is_public" in data:
+                c["is_public"] = bool(data.get("is_public"))
+            if "avatar" in data and data["avatar"]:
+                av = data["avatar"]
+                if isinstance(av, str) and av.startswith("data:"):
+                    try:
+                        _, pub_av, _ = save_media_file_helper(av, "image")
+                        av = pub_av
+                    except Exception:
+                        pass
+                c["avatar"] = clean_media_path(av)
+            if "reference_image" in data and data["reference_image"]:
+                rv = data["reference_image"]
+                if isinstance(rv, str) and rv.startswith("data:"):
+                    try:
+                        _, pub_rv, _ = save_media_file_helper(rv, "image")
+                        rv = pub_rv
+                    except Exception:
+                        pass
+                c["reference_image"] = clean_media_path(rv)
+            save_db()
+            return jsonify({"success": True, "character": c})
+    return jsonify({"error": "Karakter bulunamadı."}), 404
 
 
 @app.route("/api/characters/<char_id>", methods=["DELETE"])
@@ -1771,6 +2005,15 @@ def api_generate_media():
     trained_id = data.get("trained_id", "")
     raw_source = data.get("source_media") or ""
     source_media = clean_media_path(raw_source) if not str(raw_source).startswith("data:") else str(raw_source).strip()
+    raw_sources = data.get("source_images") or []
+    source_images = [
+        clean_media_path(s) if not str(s).startswith("data:") else str(s).strip()
+        for s in raw_sources if s
+    ]
+    if source_media and not source_images:
+        source_images = [source_media]
+    elif source_images and not source_media:
+        source_media = source_images[0]
     strength = float(data.get("strength") or 0.65)
 
     # 422 Engelleyici parametreleri
@@ -1847,7 +2090,8 @@ def api_generate_media():
                 source_media=source_media,
                 strength=strength,
                 bypass_422=bypass_422,
-                bypass_model_api_id=bypass_api_model_id
+                bypass_model_api_id=bypass_api_model_id,
+                source_images=source_images
             )
         else:
             data_url, api_err = smart_generate_video(
@@ -1898,6 +2142,23 @@ def api_generate_media():
     })
 
 
+@app.route("/static/media/<path:filename>", methods=["GET"])
+def serve_media_fallback(filename):
+    safe_name = os.path.basename(filename)
+    filepath = os.path.join(MEDIA_DIR, safe_name)
+    if os.path.exists(filepath):
+        return send_file(filepath)
+    mime_type, raw_bytes = get_media_blob_from_pg(safe_name)
+    if raw_bytes:
+        try:
+            with open(filepath, "wb") as f:
+                f.write(raw_bytes)
+        except Exception:
+            pass
+        return Response(raw_bytes, mimetype=mime_type or "application/octet-stream")
+    return "Medya bulunamadı.", 404
+
+
 @app.route("/api/media/download/<media_id>", methods=["GET"])
 @login_required
 def api_download_media(media_id):
@@ -1906,9 +2167,12 @@ def api_download_media(media_id):
         return "Medya veritabanında bulunamadı.", 404
     filename = os.path.basename(clean_media_path(m["file_path"]))
     filepath = os.path.join(MEDIA_DIR, filename)
-    if not os.path.exists(filepath):
-        return "Dosya diskte bulunamadı.", 404
-    return send_file(filepath, as_attachment=True, download_name=filename)
+    if os.path.exists(filepath):
+        return send_file(filepath, as_attachment=True, download_name=filename)
+    mime_type, raw_bytes = get_media_blob_from_pg(filename)
+    if raw_bytes:
+        return send_file(BytesIO(raw_bytes), mimetype=mime_type or "application/octet-stream", as_attachment=True, download_name=filename)
+    return "Dosya bulunamadı.", 404
 
 
 @app.route("/api/admin/state", methods=["GET"])

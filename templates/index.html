@@ -9,9 +9,9 @@
     <style>
         * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; box-sizing: border-box; }
         html, body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #050609;
-            color: #f1f5f9;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #09090b;
+            color: #fafafa;
             height: 100dvh;
             width: 100vw;
             overflow: hidden;
@@ -22,26 +22,23 @@
         input, textarea, select { user-select: text; font-size: 16px !important; }
         @media (min-width: 1024px) { input, textarea, select { font-size: 13px !important; } }
 
-        .glass { background: rgba(11, 13, 20, 0.92); backdrop-filter: blur(18px); border: 1px solid rgba(255, 255, 255, 0.06); }
-        .glass-card { background: linear-gradient(180deg, rgba(20, 24, 38, 0.85) 0%, rgba(14, 17, 28, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.06); }
+        .glass { background: #111114; border: 1px solid rgba(255, 255, 255, 0.08); }
+        .glass-card { background: #141418; border: 1px solid rgba(255, 255, 255, 0.08); transition: border-color 0.15s ease, background-color 0.15s ease; }
+        .glass-card:hover { border-color: rgba(255, 255, 255, 0.16); background: #18181d; }
         .chat-canvas {
-            background-color: #080a11;
-            background-image:
-                radial-gradient(circle at 15% 15%, rgba(139, 92, 246, 0.06), transparent 40%),
-                radial-gradient(circle at 85% 85%, rgba(79, 70, 229, 0.05), transparent 40%);
+            background-color: #09090b;
         }
         .input-dock {
-            background: linear-gradient(180deg, rgba(11, 13, 20, 0.88) 0%, rgba(8, 10, 16, 0.98) 100%);
-            backdrop-filter: blur(20px);
-            border-top: 1px solid rgba(255, 255, 255, 0.07);
+            background: #0e0e11;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
-        .rp-action { color: #c084fc; font-style: italic; }
+        .rp-action { color: #a78bfa; font-style: italic; }
         .rp-quote { color: #fde047; font-weight: 500; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #23293b; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 9999px; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -343,9 +340,30 @@
                         </div>
                     </div>
 
-                    <div class="space-y-1">
-                        <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-1">Prompt</label>
-                        <textarea id="imgPrompt" rows="3" placeholder="A dark fantasy assassin girl standing in neon rain, highly detailed, 8k..." class="w-full bg-[#050609] border border-slate-800 rounded-2xl p-3.5 text-xs focus:border-pink-500 focus:outline-none transition resize-none"></textarea>
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between px-1">
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Çoklu Referans Görsel (Multi-Edit)</label>
+                            <label class="cursor-pointer text-[11px] font-semibold text-indigo-400 hover:text-indigo-300">
+                                + Görsel Ekle
+                                <input type="file" accept="image/*" multiple class="hidden" onchange="addMultiEditImages(event)">
+                            </label>
+                        </div>
+                        <div id="multiEditPreviewStrip" class="flex flex-wrap gap-2 empty:hidden"></div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between px-1">
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Prompt</label>
+                            <span class="text-[10px] text-zinc-500">Hızlı Şablonlar</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 pb-1">
+                            <button type="button" onclick="applyPromptPreset('cinematic lighting, 8k uhd, highly detailed, photorealistic')" class="px-2.5 py-1 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-[11px] text-zinc-300 border border-white/5 transition">Cinematic 8K</button>
+                            <button type="button" onclick="applyPromptPreset('anime style, studio quality, vibrant colors, crisp lineart')" class="px-2.5 py-1 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-[11px] text-zinc-300 border border-white/5 transition">Anime</button>
+                            <button type="button" onclick="applyPromptPreset('dark fantasy, atmospheric, moody shadows, epic composition')" class="px-2.5 py-1 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-[11px] text-zinc-300 border border-white/5 transition">Dark Fantasy</button>
+                            <button type="button" onclick="applyPromptPreset('cyberpunk neon, rain reflections, futuristic city')" class="px-2.5 py-1 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-[11px] text-zinc-300 border border-white/5 transition">Cyberpunk</button>
+                            <button type="button" onclick="applyPromptPreset('studio portrait, softbox lighting, shallow depth of field, 85mm')" class="px-2.5 py-1 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-[11px] text-zinc-300 border border-white/5 transition">Portre</button>
+                        </div>
+                        <textarea id="imgPrompt" rows="3" placeholder="A dark fantasy assassin girl standing in neon rain, highly detailed, 8k..." class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3.5 text-xs focus:border-indigo-500 focus:outline-none transition resize-none"></textarea>
                     </div>
                     <div class="space-y-1">
                         <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-1">Negatif Prompt</label>
@@ -1168,6 +1186,44 @@
             if (promptText) document.getElementById(tStudio === "image" ? "imgPrompt" : "vidPrompt").value = promptText;
         }
 
+        STATE.multiEditImages = STATE.multiEditImages || [];
+
+        function applyPromptPreset(presetText) {
+            const el = document.getElementById("imgPrompt");
+            if (!el) return;
+            const cur = el.value.trim();
+            el.value = cur ? `${cur}, ${presetText}` : presetText;
+        }
+
+        function addMultiEditImages(event) {
+            const files = Array.from(event.target.files || []);
+            files.slice(0, 4 - STATE.multiEditImages.length).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    STATE.multiEditImages.push(e.target.result);
+                    renderMultiEditPreview();
+                };
+                reader.readAsDataURL(file);
+            });
+            event.target.value = "";
+        }
+
+        function removeMultiEditImage(idx) {
+            STATE.multiEditImages.splice(idx, 1);
+            renderMultiEditPreview();
+        }
+
+        function renderMultiEditPreview() {
+            const strip = document.getElementById("multiEditPreviewStrip");
+            if (!strip) return;
+            strip.innerHTML = STATE.multiEditImages.map((src, i) => `
+                <div class="relative w-14 h-14 rounded-lg overflow-hidden border border-white/10 group">
+                    <img src="${src}" class="w-full h-full object-cover">
+                    <button type="button" onclick="removeMultiEditImage(${i})" class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/80 text-white text-[10px] flex items-center justify-center opacity-80 hover:opacity-100">✕</button>
+                </div>
+            `).join("");
+        }
+
         async function generateMedia(type) {
             const btn = document.getElementById(type === "image" ? "btnGenImg" : "btnGenVid");
             const originalText = btn.innerText;
@@ -1176,13 +1232,14 @@
 
             try {
                 const sourceMedia = type === "image" ? STATE.imgSourceMedia : STATE.vidSourceMedia;
+                const multiImgs = type === "image" ? [...(sourceMedia ? [sourceMedia] : []), ...(STATE.multiEditImages || [])] : [];
                 const strEl = document.getElementById(type === "image" ? "imgStrength" : "vidStrength");
                 const str = strEl ? strEl.value : "0.65";
                 const trnEl = document.getElementById(type === "image" ? "imgTrainedSelect" : "vidTrainedSelect");
                 const trainedId = trnEl ? trnEl.value : "";
 
                 let mode = type === "image"
-                    ? (sourceMedia ? "img2img" : "txt2img")
+                    ? ((sourceMedia || multiImgs.length > 0) ? "img2img" : "txt2img")
                     : (sourceMedia ? (sourceMedia.includes("mp4") || sourceMedia.startsWith("data:video") ? "vid2vid" : "img2vid") : "txt2vid");
 
                 const payload = {
@@ -1194,6 +1251,7 @@
                     model_id: document.getElementById(type === "image" ? "imgModelSelect" : "vidModelSelect").value,
                     trained_id: trainedId,
                     source_media: sourceMedia,
+                    source_images: multiImgs,
                     strength: parseFloat(str || 0.65)
                 };
 
