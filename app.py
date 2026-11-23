@@ -234,7 +234,11 @@ def ensure_db_compatibility(loaded):
     else:
         loaded["users"]["Admin"]["role"] = "admin"
 
-    for c in loaded.get("characters", []):
+    loaded["characters"] = [
+        c for c in loaded.get("characters", [])
+        if isinstance(c, dict) and c.get("id") != "char_seraphina"
+    ]
+    for c in loaded["characters"]:
         if not c.get("reference_image"):
             c["reference_image"] = c.get("avatar", "")
 
