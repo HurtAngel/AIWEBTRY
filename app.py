@@ -26,7 +26,10 @@ app.secret_key = os.getenv("SECRET_KEY", "nexus-ai-rp-studio-secret-key-2026")
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_FILE = os.path.join(BASE_DIR, "db.json")
 MEDIA_DIR = os.path.join(BASE_DIR, "static", "media")
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://neondb_owner:npg_PHUvcG69SyRx@ep-red-truth-beuo011o-pooler.c-9.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+).strip()
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
 db_lock = threading.RLock()
