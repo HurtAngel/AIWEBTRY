@@ -637,6 +637,51 @@ def call_llm_api(messages, model_api_id, endpoint_override="", temperature=None,
     return data["choices"][0]["message"]["content"]
 
 
+def call_llm_api_stream(messages, model_api_id, endpoint_override="", temperature=None, max_tokens=None):
+    api_key = (DB["settings"].get("venice_api_key") or os.getenv("VENICE_API_KEY", "")).strip()
+    url = endpoint_override.strip() if endpoint_override else DB["settings"].get("chat_endpoint", "https://api.venice.ai/api/v1/chat/completions")
+    temp = float(temperature if temperature is not None else DB["settings"].get("default_temperature", 0.85))
+    mtok = int(max_tokens if max_tokens is not None else DB["settings"].get("default_max_tokens", 600))
+
+    if not api_key:
+        if DB["settings"].get("demo_fallback_when_no_key", "false") == "true":
+            last_user_msg = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "Merhaba")
+            yield f"*[Demo Modu]*\n\n*Bakışlarını sana çevirir.* \"{last_user_msg[:80]}... Admin panelinden `venice_api_key` girdiğinde gerçek **{model_api_id}** modeliyle konuşacağız.\""
+            return
+        raise Exception("Venice API Anahtarı tanımlanmamış!")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": model_api_id,
+        "messages": messages,
+        "temperature": temp,
+        "max_tokens": mtok,
+        "stream": True
+    }
+    with requests.post(url, headers=headers, json=payload, stream=True, timeout=120) as resp:
+        if resp.status_code != 200:
+            raise Exception(f"Venice Chat API Hatası ({resp.status_code}): {resp.text[:300]}")
+        for raw_line in resp.iter_lines(decode_unicode=True):
+            if not raw_line:
+                continue
+            line = raw_line.strip()
+            if not line.startswith("data:"):
+                continue
+            data_str = line[5:].strip()
+            if data_str == "[DONE]":
+                break
+            try:
+                chunk = json.loads(data_str)
+                delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content")
+                if delta:
+                    yield delta
+            except Exception:
+                continue
+
+
 def compress_chat_memory_if_needed(chat, force=False):
     trigger_count = int(DB["settings"].get("memory_trigger_count", 10))
     keep_recent = int(DB["settings"].get("memory_keep_recent", 4))
@@ -1397,6 +1442,82 @@ def build_rp_prompt_messages(user, char, chat):
 
 
 @app.route("/api/rp/chats/<chat_id>/message", methods=["POST"])
+@app.route("/api/rp/chats/<chat_id>/message/stream", methods=["POST"])
+@login_required
+def api_send_rp_message_stream(chat_id):
+    user = get_current_user()
+    chat = DB["chats"].get(chat_id)
+    if not chat or chat["user"] != user["username"]:
+        return jsonify({"error": "Sohbet bulunamadı."}), 404
+
+    data = request.json or {}
+    content = (data.get("content") or "").strip()
+    model_id = data.get("model_id")
+    temperature = data.get("temperature")
+
+    if not content:
+        return jsonify({"error": "Mesaj boş olamaz."}), 400
+
+    model_obj = (
+        next((m for m in DB["models"] if m["id"] == model_id and m["type"] == "chat"), None)
+        or next((m for m in DB["models"] if m["type"] == "chat" and m.get("active", True)), None)
+    )
+    if not model_obj:
+        return jsonify({"error": "Aktif dil modeli bulunamadı."}), 400
+
+    ok, err, _ = check_and_deduct_credit(user, model_obj)
+    if not ok:
+        return jsonify({"error": err}), 403
+
+    char = next((c for c in DB["characters"] if c["id"] == chat["character_id"]), None)
+    if not char:
+        refund_credit(user, model_obj)
+        return jsonify({"error": "Karakter silinmiş."}), 404
+
+    user_msg = {
+        "id": "msg_" + uuid.uuid4().hex[:8],
+        "role": "user",
+        "content": content,
+        "swipes": [content],
+        "active_swipe": 0,
+        "timestamp": datetime.now().strftime("%H:%M")
+    }
+    chat["messages"].append(user_msg)
+    prompt_msgs = build_rp_prompt_messages(user, char, chat)
+
+    def generate():
+        full_reply = []
+        try:
+            for delta in call_llm_api_stream(
+                prompt_msgs,
+                model_obj["api_model_id"],
+                model_obj.get("endpoint_override", ""),
+                temperature=temperature
+            ):
+                full_reply.append(delta)
+                yield f"data: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+            ai_reply = "".join(full_reply)
+            ai_msg = {
+                "id": "msg_" + uuid.uuid4().hex[:8],
+                "role": "assistant",
+                "content": ai_reply,
+                "swipes": [ai_reply],
+                "active_swipe": 0,
+                "timestamp": datetime.now().strftime("%H:%M")
+            }
+            chat["messages"].append(ai_msg)
+            chat["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            compress_chat_memory_if_needed(chat)
+            save_db()
+            yield f"data: {json.dumps({'done': True, 'chat': chat, 'credits': user['credits']}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            chat["messages"].pop()
+            refund_credit(user, model_obj)
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+
+    return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
 @login_required
 def api_send_rp_message(chat_id):
     user = get_current_user()
@@ -1670,6 +1791,63 @@ def api_edit_or_delete_rp_message(chat_id, msg_id):
             return jsonify({"success": True, "chat": chat})
 
     return jsonify({"error": "Mesaj bulunamadı."}), 404
+
+
+@app.route("/api/assistant/send/stream", methods=["POST"])
+@login_required
+def api_assistant_send_stream():
+    user = get_current_user()
+    data = request.json or {}
+    chat_id = data.get("chat_id")
+    content = (data.get("content") or "").strip()
+    model_id = data.get("model_id")
+
+    if not content:
+        return jsonify({"error": "Mesaj boş olamaz."}), 400
+
+    model_obj = (
+        next((m for m in DB["models"] if m["id"] == model_id and m["type"] == "chat"), None)
+        or next((m for m in DB["models"] if m["type"] == "chat" and m.get("active", True)), None)
+    )
+    if not model_obj:
+        return jsonify({"error": "Aktif dil modeli bulunamadı."}), 400
+
+    ok, err, _ = check_and_deduct_credit(user, model_obj)
+    if not ok:
+        return jsonify({"error": err}), 403
+
+    chat = DB["assistant_chats"].get(chat_id) if chat_id else None
+    if not chat:
+        chat_id = "ast_" + uuid.uuid4().hex[:8]
+        chat = {
+            "id": chat_id,
+            "user": user["username"],
+            "title": content[:32],
+            "messages": [],
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        DB["assistant_chats"][chat_id] = chat
+
+    chat["messages"].append({"role": "user", "content": content})
+    prompt_msgs = [{"role": "system", "content": "Sen yardımcı, zeki ve net yanıtlar veren bir AI asistansın."}] + chat["messages"][-20:]
+
+    def generate():
+        full_reply = []
+        try:
+            for delta in call_llm_api_stream(prompt_msgs, model_obj["api_model_id"], model_obj.get("endpoint_override", "")):
+                full_reply.append(delta)
+                yield f"data: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+            reply = "".join(full_reply)
+            chat["messages"].append({"role": "assistant", "content": reply})
+            chat["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            save_db()
+            yield f"data: {json.dumps({'done': True, 'chat': chat, 'credits': user['credits']}, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            chat["messages"].pop()
+            refund_credit(user, model_obj)
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+
+    return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.route("/api/assistant/send", methods=["POST"])

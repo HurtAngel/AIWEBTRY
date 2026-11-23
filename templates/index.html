@@ -1146,15 +1146,55 @@
             input.value = ""; input.style.height = '';
             const btn = document.getElementById("rpSendBtn");
             btn.disabled = true; btn.innerText = "...";
+
+            const box = document.getElementById("rpMessagesBox");
+            const tempUserId = "tmp_u_" + Date.now();
+            const tempAiId = "tmp_a_" + Date.now();
+            STATE.activeRpChat.messages.push({ id: tempUserId, role: "user", content, swipes: [content], active_swipe: 0 });
+            STATE.activeRpChat.messages.push({ id: tempAiId, role: "assistant", content: "", swipes: [""], active_swipe: 0 });
+            renderRpMessages();
+
+            let streamText = "";
             try {
-                const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/message`, {
+                const res = await fetch(`/api/rp/chats/${STATE.activeRpChat.id}/message/stream`, {
                     method: "POST", headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({ content, model_id: document.getElementById("rpModelSelect").value })
                 });
-                const data = await res.json();
-                if (!res.ok || data.error) return alert(data.error || "Yanıt alınamadı.");
-                updateChatInState(data.chat); STATE.user.credits = data.credits; renderHeader();
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || "Yanıt alınamadı.");
+                }
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n\n");
+                    buffer = lines.pop() || "";
+                    for (const line of lines) {
+                        if (!line.startsWith("data:")) continue;
+                        const evt = JSON.parse(line.slice(5).trim());
+                        if (evt.error) throw new Error(evt.error);
+                        if (evt.delta) {
+                            streamText += evt.delta;
+                            const lastMsg = STATE.activeRpChat.messages[STATE.activeRpChat.messages.length - 1];
+                            if (lastMsg && lastMsg.id === tempAiId) {
+                                lastMsg.content = streamText;
+                                renderRpMessages();
+                            }
+                        }
+                        if (evt.done && evt.chat) {
+                            updateChatInState(evt.chat);
+                            STATE.user.credits = evt.credits;
+                            renderHeader();
+                        }
+                    }
+                }
             } catch (err) {
+                STATE.activeRpChat.messages = STATE.activeRpChat.messages.filter(m => m.id !== tempUserId && m.id !== tempAiId);
+                renderRpMessages();
                 alert("Mesaj gönderilirken hata oluştu: " + err.message);
             } finally {
                 btn.disabled = false; btn.innerText = STATE.settings.ui_btn_send || "Gönder";
@@ -1253,25 +1293,57 @@
             input.value = "";
             const btn = document.getElementById("astSendBtn");
             if (btn) { btn.disabled = true; btn.innerText = "..."; }
+
+            if (!STATE.activeAstChat) {
+                STATE.activeAstChat = { id: null, title: content.slice(0, 32), messages: [] };
+            }
+            STATE.activeAstChat.messages.push({ role: "user", content });
+            STATE.activeAstChat.messages.push({ role: "assistant", content: "" });
+            renderAssistantMessages();
+
+            let streamText = "";
             try {
-                const res = await fetch("/api/assistant/send", {
+                const res = await fetch("/api/assistant/send/stream", {
                     method: "POST", headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({
-                        chat_id: STATE.activeAstChat ? STATE.activeAstChat.id : null,
+                        chat_id: STATE.activeAstChat.id,
                         content,
                         model_id: document.getElementById("astModelSelect").value
                     })
                 });
-                const data = await res.json();
-                if (!res.ok || data.error) return alert(data.error || "Asistan yanıt veremedi.");
-                if (!STATE.activeAstChat && data.chat) STATE.assistant_chats.unshift(data.chat);
-                else {
-                    const idx = STATE.assistant_chats.findIndex(c => c.id === data.chat.id);
-                    if (idx > -1) STATE.assistant_chats[idx] = data.chat;
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || "Asistan yanıt veremedi.");
                 }
-                STATE.activeAstChat = data.chat;
-                STATE.user.credits = data.credits;
-                renderHeader(); renderAssistantSidebar(); renderAssistantMessages();
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n\n");
+                    buffer = lines.pop() || "";
+                    for (const line of lines) {
+                        if (!line.startsWith("data:")) continue;
+                        const evt = JSON.parse(line.slice(5).trim());
+                        if (evt.error) throw new Error(evt.error);
+                        if (evt.delta) {
+                            streamText += evt.delta;
+                            const msgs = STATE.activeAstChat.messages;
+                            msgs[msgs.length - 1].content = streamText;
+                            renderAssistantMessages();
+                        }
+                        if (evt.done && evt.chat) {
+                            const idx = STATE.assistant_chats.findIndex(c => c.id === evt.chat.id);
+                            if (idx > -1) STATE.assistant_chats[idx] = evt.chat;
+                            else STATE.assistant_chats.unshift(evt.chat);
+                            STATE.activeAstChat = evt.chat;
+                            STATE.user.credits = evt.credits;
+                            renderHeader(); renderAssistantSidebar(); renderAssistantMessages();
+                        }
+                    }
+                }
             } catch (err) {
                 alert("Bağlantı hatası: " + err.message);
             } finally {
