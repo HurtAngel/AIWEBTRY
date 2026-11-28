@@ -643,8 +643,7 @@ def call_llm_api(messages, model_api_id, endpoint_override="", temperature=None,
         "max_tokens": mtok,
         "venice_parameters": {
             "disable_thinking": True,
-            "strip_thinking_response": True,
-            "include_venice_system_prompt": False
+            "strip_thinking_response": True
         }
     }
     resp = requests.post(url, headers=headers, json=payload, timeout=90)
@@ -679,8 +678,7 @@ def call_llm_api_stream(messages, model_api_id, endpoint_override="", temperatur
         "stream": True,
         "venice_parameters": {
             "disable_thinking": True,
-            "strip_thinking_response": True,
-            "include_venice_system_prompt": False
+            "strip_thinking_response": True
         }
     }
     with requests.post(url, headers=headers, json=payload, stream=True, timeout=120) as resp:
@@ -1848,8 +1846,15 @@ def api_edit_or_delete_rp_message(chat_id, msg_id):
     return jsonify({"error": "Mesaj bulunamadı."}), 404
 
 
-def build_assistant_system_prompt(code_mode=False, workspace_files=None, active_file="", custom_system=""):
-    base = (custom_system or "").strip() or "Sen yardımcı, zeki, doğrudan sonuca giden ve net yanıtlar veren bir AI asistansın. Düşünme sürecini (<think>) asla yazma, doğrudan cevabı ver."
+def build_assistant_system_prompt(code_mode=False, workspace_files=None, active_file="", custom_system="", model_name="NEXUS AI"):
+    identity_rule = (
+        f"KİMLİK KURALI: Sen NEXUS AI platformuna ait '{model_name}' modelisin. "
+        "Hangi API, sağlayıcı veya altyapı modelini kullandığını (Venice, OpenAI, Anthropic, Meta, Llama, Qwen, DeepSeek, Google vb.) "
+        "KESİNLİKLE ve ASLA söyleme. Sana kim olduğun veya hangi model olduğun sorulduğunda yalnızca "
+        f"'Ben NEXUS AI platformunun {model_name} modeliyim' şeklinde yanıt ver. "
+        "Düşünme sürecini (<think>) asla yazma, doğrudan cevabı ver."
+    )
+    base = ((custom_system or "").strip() or "Sen yardımcı, zeki, sansürsüz, doğrudan sonuca giden ve net yanıtlar veren bir AI asistansın.") + "\n\n" + identity_rule
     if not code_mode:
         return base
 
@@ -1953,7 +1958,8 @@ def api_assistant_send_stream():
         code_mode=code_mode,
         workspace_files=chat.get("workspace_files") or workspace_files,
         active_file=active_file,
-        custom_system=custom_system
+        custom_system=custom_system,
+        model_name=model_obj.get("name", "NEXUS AI")
     )
     prompt_msgs = [{"role": "system", "content": sys_prompt}] + chat["messages"][-20:]
 
@@ -2033,7 +2039,8 @@ def api_assistant_send():
         code_mode=code_mode,
         workspace_files=chat.get("workspace_files") or workspace_files,
         active_file=active_file,
-        custom_system=custom_system
+        custom_system=custom_system,
+        model_name=model_obj.get("name", "NEXUS AI")
     )
     prompt_msgs = [{"role": "system", "content": sys_prompt}] + chat["messages"][-20:]
 
