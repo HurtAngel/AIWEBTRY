@@ -22,7 +22,61 @@
             overflow: hidden;
             overscroll-behavior: none;
             -webkit-text-size-adjust: 100%;
+            user-select: text;
+        }
+        button, nav, header { user-select: none; }
+        .code-card {
+            background-color: #040407;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 0.75rem;
+            overflow: hidden;
+            margin: 0.65rem 0;
+        }
+        .code-card-header {
+            background-color: #0b0b10;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+            padding: 0.45rem 0.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+        .code-pre {
+            margin: 0;
+            padding: 0.75rem;
+            overflow-x: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.55;
+            color: #e4e4e7;
+            user-select: text;
+            tab-size: 2;
+        }
+        .code-line {
+            display: flex;
+            gap: 0.85rem;
+        }
+        .code-ln {
+            color: #52525b;
+            min-width: 2rem;
+            text-align: right;
             user-select: none;
+            flex-shrink: 0;
+        }
+        .code-txt {
+            white-space: pre;
+            flex: 1;
+            user-select: text;
+        }
+        .inline-code {
+            background-color: #0d0d14;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 0.35rem;
+            padding: 0.08rem 0.35rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.9em;
+            color: #a5f3fc;
         }
         input, textarea, select {
             user-select: text;
@@ -388,9 +442,9 @@
             </div>
         </section>
 
-        <!-- 2. SEKME: AI ASİSTAN -->
+        <!-- 2. SEKME: AI ASİSTAN & KOD STÜDYOSU -->
         <section id="tab_assistant" class="flex-1 min-h-0 hidden flex-col lg:flex-row overflow-hidden w-full">
-            <aside id="astSidebarPanel" class="fixed lg:static inset-y-0 left-0 z-50 w-[280px] lg:w-[300px] drawer-surface flex flex-col shrink-0 h-full overflow-y-auto p-4 space-y-4 -translate-x-full lg:translate-x-0 transition-transform duration-200">
+            <aside id="astSidebarPanel" class="fixed lg:static inset-y-0 left-0 z-50 w-[280px] lg:w-[270px] drawer-surface flex flex-col shrink-0 h-full overflow-y-auto p-4 space-y-4 -translate-x-full lg:translate-x-0 transition-transform duration-200">
                 <div class="flex items-center justify-between pb-2 border-b border-white/10">
                     <h2 class="text-xs font-bold uppercase tracking-widest text-zinc-300">Asistan Geçmişi</h2>
                     <div class="flex items-center gap-1.5">
@@ -400,18 +454,98 @@
                 </div>
                 <div id="astChatList" class="space-y-1"></div>
             </aside>
-            <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
-                <div class="h-[52px] px-4 border-b border-white/10 flex items-center justify-between shrink-0 panel-surface z-10">
-                    <div>
-                        <h2 class="font-bold text-xs lg:text-sm text-white">AI Asistan</h2>
-                        <p class="text-[10px] text-zinc-400 hidden sm:block">Sorular, kodlama ve içerik üretimi</p>
+
+            <div class="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
+                <!-- SOHBET KOLONU -->
+                <div class="flex-1 min-h-0 flex flex-col overflow-hidden min-w-0">
+                    <div class="min-h-[52px] px-3 lg:px-4 py-2 border-b border-white/10 flex flex-wrap items-center justify-between gap-2 shrink-0 panel-surface z-10">
+                        <div class="flex items-center gap-2.5">
+                            <div>
+                                <h2 class="font-bold text-xs lg:text-sm text-white">AI Asistan</h2>
+                                <p class="text-[10px] text-zinc-400 hidden sm:block">Kodlama, satır bazlı düzenleme ve canlı test</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-950 border border-emerald-500/40 text-[10px] font-bold text-emerald-200 cursor-pointer">
+                                <input id="astCodeMode" type="checkbox" checked onchange="onAstCodeModeToggle()" class="accent-emerald-400">
+                                <span>Kod Modu</span>
+                            </label>
+                            <button onclick="toggleAstParams()" class="px-2.5 py-1.5 rounded-lg btn-outline-zinc text-[10px] font-bold">Parametreler</button>
+                            <button onclick="toggleAstWorkspace()" id="astWorkspaceToggleBtn" class="px-2.5 py-1.5 rounded-lg btn-outline-cyan text-[10px] font-bold">Kod Alanı</button>
+                            <select id="astModelSelect" class="rounded-lg px-2 py-1.5 text-[10px] max-w-[140px] sm:max-w-[190px]"></select>
+                        </div>
                     </div>
-                    <select id="astModelSelect" class="rounded-lg px-3 py-1.5 text-[10px]"></select>
+
+                    <!-- PARAMETRELER ÇEKMECESİ -->
+                    <div id="astParamsDrawer" class="hidden panel-surface border-b border-white/10 p-3 text-xs space-y-2.5 shrink-0 z-10">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="font-bold text-zinc-200 text-[11px]">Model Parametreleri</span>
+                            <span class="px-2.5 py-0.5 rounded-md bg-zinc-950 border border-rose-500/50 text-rose-300 text-[10px] font-bold">Düşünme (Process): Kapalı (Tüm Modellerde Zorunlu)</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div class="space-y-1">
+                                <div class="flex justify-between text-[10px] text-zinc-400 font-bold">
+                                    <span>Sıcaklık (Temperature)</span>
+                                    <span id="astTempVal" class="text-cyan-300">0.30</span>
+                                </div>
+                                <input id="astTemp" type="range" min="0" max="1.4" step="0.05" value="0.30" oninput="document.getElementById('astTempVal').innerText=parseFloat(this.value).toFixed(2)" class="w-full h-1.5 bg-zinc-800 rounded-lg accent-cyan-400">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[10px] text-zinc-400 font-bold block">Maksimum Token</label>
+                                <select id="astMaxTokens" class="w-full rounded-lg px-2.5 py-1.5 text-xs">
+                                    <option value="1024">1024 Token</option>
+                                    <option value="2048">2048 Token</option>
+                                    <option value="4096" selected>4096 Token (Kod İçin Önerilen)</option>
+                                    <option value="8192">8192 Token</option>
+                                </select>
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[10px] text-zinc-400 font-bold block">Özel Sistem Talimatı (Opsiyonel)</label>
+                                <input id="astSystemPrompt" type="text" placeholder="Örn: Sadece temiz Vanilla JS yaz..." class="w-full rounded-lg px-2.5 py-1.5 text-xs">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="astMessagesBox" class="flex-1 min-h-0 overflow-y-auto p-3 lg:p-5 space-y-4"></div>
+
+                    <div class="p-2.5 lg:p-3 input-dock flex items-end gap-2 shrink-0 z-20">
+                        <textarea id="astInput" rows="1" placeholder="Soru sor, kod yazdır veya çalışma alanındaki satırları düzenlet..." onkeydown="if(event.key==='Enter' && !event.shiftKey && window.innerWidth>=1024){event.preventDefault(); sendAssistantMessage();}" oninput="this.style.height='';this.style.height=Math.min(this.scrollHeight, 140)+'px'" class="flex-1 rounded-xl px-3.5 py-2.5 text-sm resize-none min-h-[44px] max-h-36"></textarea>
+                        <button onclick="sendAssistantMessage()" id="astSendBtn" class="h-[44px] px-5 rounded-xl btn-outline-cyan font-bold text-xs shrink-0">Gönder</button>
+                    </div>
                 </div>
-                <div id="astMessagesBox" class="flex-1 min-h-0 overflow-y-auto p-4 lg:p-6 space-y-4"></div>
-                <div class="p-2.5 lg:p-3 input-dock flex items-center gap-2 shrink-0 z-20">
-                    <input id="astInput" type="text" placeholder="Asistana istediğini sor..." onkeydown="if(event.key==='Enter') sendAssistantMessage()" class="flex-1 h-[44px] rounded-xl px-4 text-sm">
-                    <button onclick="sendAssistantMessage()" id="astSendBtn" class="h-[44px] px-5 rounded-xl btn-outline-cyan font-bold text-xs shrink-0">Gönder</button>
+
+                <!-- KOD ÇALIŞMA ALANI & CANLI ÖNİZLEME (WORKSPACE) -->
+                <div id="astWorkspacePanel" class="hidden w-full lg:w-[46%] xl:w-[48%] border-t lg:border-t-0 lg:border-l border-white/10 panel-surface flex flex-col min-h-0 h-[55%] lg:h-full shrink-0">
+                    <div class="px-3 py-2 border-b border-white/10 flex flex-wrap items-center justify-between gap-2 shrink-0 bg-[#060609]">
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="setAstWsView('editor')" id="wsTabEditor" class="px-2.5 py-1 rounded-lg btn-outline-cyan text-[10px] font-bold">Editör</button>
+                            <button onclick="setAstWsView('preview')" id="wsTabPreview" class="px-2.5 py-1 rounded-lg btn-outline-zinc text-[10px] font-bold">Canlı Önizleme</button>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="createWorkspaceFile()" class="px-2.5 py-1 rounded-lg btn-outline-emerald text-[10px] font-bold">+ Dosya</button>
+                            <button onclick="copyActiveWorkspaceFile()" class="px-2.5 py-1 rounded-lg btn-outline-zinc text-[10px] font-bold">Kopyala</button>
+                            <button onclick="downloadActiveWorkspaceFile()" class="px-2.5 py-1 rounded-lg btn-outline-zinc text-[10px] font-bold">İndir</button>
+                            <button onclick="saveWorkspaceToServer(true)" class="px-2.5 py-1 rounded-lg btn-outline-violet text-[10px] font-bold">Kaydet</button>
+                        </div>
+                    </div>
+
+                    <!-- DOSYA & KLASÖR SEKMELERİ -->
+                    <div id="astWsFileTabs" class="px-2.5 py-1.5 border-b border-white/10 flex items-center gap-1.5 overflow-x-auto scrollbar-hide shrink-0 bg-[#040407]"></div>
+
+                    <!-- SATIR NUMARALI EDİTÖR -->
+                    <div id="astWsEditorWrap" class="flex-1 min-h-0 flex overflow-hidden bg-[#040407]">
+                        <pre id="astWsLineNumbers" class="m-0 py-3 px-2.5 text-right font-mono text-[12px] leading-[1.55] text-zinc-600 bg-[#06060a] border-r border-white/10 select-none overflow-hidden min-w-[2.75rem]">1</pre>
+                        <textarea id="astWsEditor" spellcheck="false" oninput="onWorkspaceEditorInput()" onscroll="syncWorkspaceLineScroll()" placeholder="Dosya seçin veya + Dosya ile yeni dosya/klasör (örn: index.html, css/style.css) oluşturun..." class="flex-1 w-full h-full p-3 font-mono text-[12px] leading-[1.55] text-zinc-100 bg-transparent border-0 resize-none focus:outline-none whitespace-pre overflow-auto"></textarea>
+                    </div>
+
+                    <!-- CANLI ÖNİZLEME (SANDBOX IFRAME) -->
+                    <div id="astWsPreviewWrap" class="hidden flex-1 min-h-0 flex flex-col bg-white">
+                        <div class="px-3 py-1.5 bg-[#09090d] border-b border-white/10 flex items-center justify-between text-[10px] text-zinc-400">
+                            <span id="astPreviewLabel">Önizleme: index.html</span>
+                            <button onclick="runWorkspacePreview()" class="px-2.5 py-0.5 rounded btn-outline-emerald text-[10px] font-bold">Yeniden Çalıştır</button>
+                        </div>
+                        <iframe id="astPreviewFrame" sandbox="allow-scripts allow-modals allow-forms" class="flex-1 w-full border-0 bg-white"></iframe>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1251,6 +1385,454 @@
             renderRpMessages();
         }
 
+        let CODE_BLOCKS_STORE = [];
+        STATE.astWorkspace = {};
+        STATE.astActiveFile = "";
+        STATE.astWsView = "editor";
+
+        function toggleAstParams() {
+            document.getElementById("astParamsDrawer").classList.toggle("hidden");
+        }
+
+        function onAstCodeModeToggle() {
+            const on = document.getElementById("astCodeMode").checked;
+            const tempEl = document.getElementById("astTemp");
+            if (tempEl) {
+                tempEl.value = on ? "0.30" : "0.75";
+                document.getElementById("astTempVal").innerText = parseFloat(tempEl.value).toFixed(2);
+            }
+        }
+
+        function toggleAstWorkspace(forceOpen = null) {
+            const panel = document.getElementById("astWorkspacePanel");
+            if (!panel) return;
+            const open = forceOpen !== null ? forceOpen : panel.classList.contains("hidden");
+            panel.classList.toggle("hidden", !open);
+            const btn = document.getElementById("astWorkspaceToggleBtn");
+            if (btn) btn.className = open ? "px-2.5 py-1.5 rounded-lg btn-outline-white text-[10px] font-bold" : "px-2.5 py-1.5 rounded-lg btn-outline-cyan text-[10px] font-bold";
+            if (open) renderWorkspaceUI();
+        }
+
+        function setAstWsView(view) {
+            STATE.astWsView = view;
+            const edWrap = document.getElementById("astWsEditorWrap");
+            const pvWrap = document.getElementById("astWsPreviewWrap");
+            const bEd = document.getElementById("wsTabEditor");
+            const bPv = document.getElementById("wsTabPreview");
+            if (view === "preview") {
+                edWrap.classList.add("hidden");
+                pvWrap.classList.remove("hidden");
+                pvWrap.classList.add("flex");
+                bEd.className = "px-2.5 py-1 rounded-lg btn-outline-zinc text-[10px] font-bold";
+                bPv.className = "px-2.5 py-1 rounded-lg btn-outline-emerald text-[10px] font-bold";
+                runWorkspacePreview();
+            } else {
+                pvWrap.classList.add("hidden");
+                pvWrap.classList.remove("flex");
+                edWrap.classList.remove("hidden");
+                bEd.className = "px-2.5 py-1 rounded-lg btn-outline-cyan text-[10px] font-bold";
+                bPv.className = "px-2.5 py-1 rounded-lg btn-outline-zinc text-[10px] font-bold";
+                renderWorkspaceUI();
+            }
+        }
+
+        function syncWorkspaceFromActiveChat() {
+            if (STATE.activeAstChat && STATE.activeAstChat.workspace_files && typeof STATE.activeAstChat.workspace_files === "object") {
+                STATE.astWorkspace = { ...STATE.activeAstChat.workspace_files };
+            } else {
+                STATE.astWorkspace = {};
+            }
+            const keys = Object.keys(STATE.astWorkspace);
+            if (!STATE.astActiveFile || !STATE.astWorkspace.hasOwnProperty(STATE.astActiveFile)) {
+                STATE.astActiveFile = keys[0] || "";
+            }
+            renderWorkspaceUI();
+        }
+
+        function renderWorkspaceUI() {
+            const tabsEl = document.getElementById("astWsFileTabs");
+            const editorEl = document.getElementById("astWsEditor");
+            if (!tabsEl || !editorEl) return;
+
+            const files = Object.keys(STATE.astWorkspace).sort();
+            if (!files.length) {
+                tabsEl.innerHTML = `<span class="text-[10px] text-zinc-500 px-1">Dosya yok. + Dosya ile oluşturun veya sohbetten kaydedin.</span>`;
+                editorEl.value = "";
+                updateWorkspaceLineNumbers();
+                return;
+            }
+            if (!STATE.astActiveFile || !STATE.astWorkspace.hasOwnProperty(STATE.astActiveFile)) {
+                STATE.astActiveFile = files[0];
+            }
+
+            tabsEl.innerHTML = files.map(fpath => {
+                const active = fpath === STATE.astActiveFile;
+                return `
+                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono shrink-0 cursor-pointer ${active ? 'bg-zinc-900 border border-cyan-500/70 text-cyan-200 font-bold' : 'bg-zinc-950 border border-white/10 text-zinc-400 hover:text-white'}">
+                    <span onclick="selectWorkspaceFile('${escapeHtml(fpath)}')">${escapeHtml(fpath)}</span>
+                    <button onclick="deleteWorkspaceFile('${escapeHtml(fpath)}')" class="text-zinc-500 hover:text-rose-400 text-[10px] font-sans font-bold ml-1" title="Dosyayı Sil">x</button>
+                </div>`;
+            }).join("");
+
+            editorEl.value = STATE.astWorkspace[STATE.astActiveFile] ?? "";
+            updateWorkspaceLineNumbers();
+        }
+
+        function selectWorkspaceFile(fpath) {
+            STATE.astActiveFile = fpath;
+            renderWorkspaceUI();
+            if (STATE.astWsView === "preview") runWorkspacePreview();
+        }
+
+        function createWorkspaceFile() {
+            const name = prompt("Dosya veya klasör yolu girin (Örn: index.html, css/style.css, js/app.js):", "index.html");
+            if (!name || !name.trim()) return;
+            const clean = name.trim().replace(/^\/+/, "");
+            if (!STATE.astWorkspace.hasOwnProperty(clean)) {
+                STATE.astWorkspace[clean] = "";
+            }
+            STATE.astActiveFile = clean;
+            toggleAstWorkspace(true);
+            setAstWsView("editor");
+            renderWorkspaceUI();
+            saveWorkspaceToServer(false);
+        }
+
+        function deleteWorkspaceFile(fpath) {
+            if (!confirm(`${fpath} dosyasını silmek istiyor musunuz?`)) return;
+            delete STATE.astWorkspace[fpath];
+            if (STATE.astActiveFile === fpath) {
+                STATE.astActiveFile = Object.keys(STATE.astWorkspace)[0] || "";
+            }
+            renderWorkspaceUI();
+            saveWorkspaceToServer(false);
+        }
+
+        function onWorkspaceEditorInput() {
+            const editorEl = document.getElementById("astWsEditor");
+            if (!STATE.astActiveFile) {
+                STATE.astActiveFile = "index.html";
+            }
+            STATE.astWorkspace[STATE.astActiveFile] = editorEl.value;
+            updateWorkspaceLineNumbers();
+        }
+
+        function updateWorkspaceLineNumbers() {
+            const editorEl = document.getElementById("astWsEditor");
+            const lnEl = document.getElementById("astWsLineNumbers");
+            if (!editorEl || !lnEl) return;
+            const count = Math.max(1, (editorEl.value || "").split("\n").length);
+            let out = "";
+            for (let i = 1; i <= count; i++) out += i + (i < count ? "\n" : "");
+            lnEl.textContent = out;
+        }
+
+        function syncWorkspaceLineScroll() {
+            const editorEl = document.getElementById("astWsEditor");
+            const lnEl = document.getElementById("astWsLineNumbers");
+            if (editorEl && lnEl) lnEl.scrollTop = editorEl.scrollTop;
+        }
+
+        async function saveWorkspaceToServer(showNotice = false) {
+            if (STATE.activeAstChat) {
+                STATE.activeAstChat.workspace_files = { ...STATE.astWorkspace };
+                if (STATE.activeAstChat.id) {
+                    try {
+                        await fetch(`/api/assistant/chats/${STATE.activeAstChat.id}/workspace`, {
+                            method: "POST",
+                            headers: {"Content-Type": "application/json"},
+                            body: JSON.stringify({ workspace_files: STATE.astWorkspace })
+                        });
+                        if (showNotice) alert("Çalışma alanı veritabanına kaydedildi.");
+                    } catch (e) {
+                        if (showNotice) alert("Kaydedilemedi: " + e.message);
+                    }
+                } else if (showNotice) {
+                    alert("Sohbete ilk mesajı gönderdiğinizde dosyalar otomatik kaydedilecektir.");
+                }
+            } else if (showNotice) {
+                alert("Dosyalar hazır. Mesaj gönderdiğinizde sohbetle birlikte veritabanına kaydedilir.");
+            }
+        }
+
+        function copyActiveWorkspaceFile() {
+            if (!STATE.astActiveFile) return;
+            copyTextToClipboard(STATE.astWorkspace[STATE.astActiveFile] || "", null);
+            alert(`${STATE.astActiveFile} kopyalandı.`);
+        }
+
+        function downloadActiveWorkspaceFile() {
+            if (!STATE.astActiveFile) return;
+            downloadTextFile(STATE.astActiveFile.split("/").pop(), STATE.astWorkspace[STATE.astActiveFile] || "");
+        }
+
+        function runWorkspacePreview() {
+            const frame = document.getElementById("astPreviewFrame");
+            const label = document.getElementById("astPreviewLabel");
+            if (!frame) return;
+
+            const files = STATE.astWorkspace;
+            let entryHtml = "";
+            let entryName = "";
+
+            if (STATE.astActiveFile && STATE.astActiveFile.toLowerCase().endsWith(".html")) {
+                entryName = STATE.astActiveFile;
+                entryHtml = files[entryName] || "";
+            } else if (files["index.html"]) {
+                entryName = "index.html";
+                entryHtml = files["index.html"];
+            } else {
+                const anyHtml = Object.keys(files).find(k => k.toLowerCase().endsWith(".html"));
+                if (anyHtml) {
+                    entryName = anyHtml;
+                    entryHtml = files[anyHtml];
+                } else {
+                    const cssAll = Object.entries(files).filter(([k]) => k.endsWith(".css")).map(([,v]) => `<style>${v}</style>`).join("\n");
+                    const jsAll = Object.entries(files).filter(([k]) => k.endsWith(".js")).map(([,v]) => `<script>${v}<\/script>`).join("\n");
+                    entryName = STATE.astActiveFile || "sandbox";
+                    entryHtml = `<!DOCTYPE html><html><head><meta charset="utf-8">${cssAll}</head><body>${jsAll || "<p style='font-family:sans-serif;padding:16px'>Önizlemek için bir .html dosyası ekleyin.</p>"}</body></html>`;
+                }
+            }
+
+            // Inline local <link rel="stylesheet" href="..."> and <script src="..."> from virtual workspace
+            let bundled = entryHtml;
+            bundled = bundled.replace(/<link[^>]+href=["']([^"']+)["'][^>]*>/gi, (match, href) => {
+                const norm = href.replace(/^\.?\//, "");
+                if (files[norm] !== undefined) return `<style>\n${files[norm]}\n</style>`;
+                return match;
+            });
+            bundled = bundled.replace(/<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi, (match, src) => {
+                const norm = src.replace(/^\.?\//, "");
+                if (files[norm] !== undefined) return `<script>\n${files[norm]}\n<\/script>`;
+                return match;
+            });
+
+            if (label) label.innerText = `Önizleme: ${entryName}`;
+            frame.srcdoc = bundled;
+        }
+
+        function copyTextToClipboard(text, btnEl) {
+            navigator.clipboard.writeText(text).then(() => {
+                if (btnEl) {
+                    const prev = btnEl.innerText;
+                    btnEl.innerText = "Kopyalandı";
+                    setTimeout(() => { btnEl.innerText = prev; }, 1400);
+                }
+            }).catch(() => {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                if (btnEl) {
+                    const prev = btnEl.innerText;
+                    btnEl.innerText = "Kopyalandı";
+                    setTimeout(() => { btnEl.innerText = prev; }, 1400);
+                }
+            });
+        }
+
+        function downloadTextFile(filename, content) {
+            const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = filename || "code.txt";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        function copyCodeBlock(idx, btnEl) {
+            const item = CODE_BLOCKS_STORE[idx];
+            if (!item) return;
+            copyTextToClipboard(item.code, btnEl);
+        }
+
+        function downloadCodeBlock(idx) {
+            const item = CODE_BLOCKS_STORE[idx];
+            if (!item) return;
+            const extMap = { html: "html", css: "css", js: "js", javascript: "js", py: "py", python: "py", json: "json", ts: "ts", sql: "sql" };
+            const fname = item.filename ? item.filename.split("/").pop() : `snippet.${extMap[item.lang] || "txt"}`;
+            downloadTextFile(fname, item.code);
+        }
+
+        function saveCodeBlockToWorkspace(idx, openPreview = false) {
+            const item = CODE_BLOCKS_STORE[idx];
+            if (!item) return;
+            let targetPath = item.filename;
+            if (!targetPath) {
+                const extMap = { html: "index.html", css: "style.css", js: "app.js", javascript: "app.js", py: "main.py", python: "main.py", json: "data.json" };
+                targetPath = prompt("Çalışma alanına hangi dosya adıyla kaydedilsin?", extMap[item.lang] || "code.txt");
+                if (!targetPath || !targetPath.trim()) return;
+                targetPath = targetPath.trim().replace(/^\/+/, "");
+            }
+            STATE.astWorkspace[targetPath] = item.code;
+            STATE.astActiveFile = targetPath;
+            toggleAstWorkspace(true);
+            renderWorkspaceUI();
+            saveWorkspaceToServer(false);
+            if (openPreview) setAstWsView("preview");
+            else setAstWsView("editor");
+        }
+
+        function applyLinePatchBlock(idx, btnEl) {
+            const item = CODE_BLOCKS_STORE[idx];
+            if (!item) return;
+            let targetPath = item.filename || STATE.astActiveFile;
+            if (!targetPath || !STATE.astWorkspace.hasOwnProperty(targetPath)) {
+                targetPath = prompt("Patch hangi dosyaya uygulansın?", targetPath || "index.html");
+                if (!targetPath) return;
+            }
+            const original = STATE.astWorkspace[targetPath] ?? "";
+            let lines = original.split("\n");
+
+            const patchLines = item.code.split("\n");
+            const ops = [];
+            let i = 0;
+            while (i < patchLines.length) {
+                const header = patchLines[i].trim();
+                let m = header.match(/^REPLACE\s+(\d+)(?:\s*-\s*(\d+))?$/i);
+                if (m) {
+                    const start = parseInt(m[1], 10);
+                    const end = m[2] ? parseInt(m[2], 10) : start;
+                    const body = [];
+                    i++;
+                    while (i < patchLines.length && patchLines[i].trim() !== "END") {
+                        body.push(patchLines[i]);
+                        i++;
+                    }
+                    ops.push({ type: "replace", start, end, body });
+                    i++;
+                    continue;
+                }
+                m = header.match(/^INSERT_AFTER\s+(\d+)$/i);
+                if (m) {
+                    const lineNo = parseInt(m[1], 10);
+                    const body = [];
+                    i++;
+                    while (i < patchLines.length && patchLines[i].trim() !== "END") {
+                        body.push(patchLines[i]);
+                        i++;
+                    }
+                    ops.push({ type: "insert", start: lineNo, end: lineNo, body });
+                    i++;
+                    continue;
+                }
+                m = header.match(/^DELETE\s+(\d+)(?:\s*-\s*(\d+))?$/i);
+                if (m) {
+                    const start = parseInt(m[1], 10);
+                    const end = m[2] ? parseInt(m[2], 10) : start;
+                    ops.push({ type: "delete", start, end, body: [] });
+                    i++;
+                    continue;
+                }
+                i++;
+            }
+
+            if (!ops.length) {
+                alert("Geçerli bir satır bazlı patch komutu (REPLACE / INSERT_AFTER / DELETE) bulunamadı.");
+                return;
+            }
+
+            // Apply bottom-up so earlier line numbers stay valid
+            ops.sort((a, b) => b.start - a.start);
+            for (const op of ops) {
+                if (op.type === "replace") {
+                    const idxStart = Math.max(0, op.start - 1);
+                    const delCount = Math.max(0, op.end - op.start + 1);
+                    lines.splice(idxStart, delCount, ...op.body);
+                } else if (op.type === "insert") {
+                    const idxAfter = Math.min(lines.length, Math.max(0, op.start));
+                    lines.splice(idxAfter, 0, ...op.body);
+                } else if (op.type === "delete") {
+                    const idxStart = Math.max(0, op.start - 1);
+                    const delCount = Math.max(0, op.end - op.start + 1);
+                    lines.splice(idxStart, delCount);
+                }
+            }
+
+            STATE.astWorkspace[targetPath] = lines.join("\n");
+            STATE.astActiveFile = targetPath;
+            toggleAstWorkspace(true);
+            renderWorkspaceUI();
+            if (STATE.astWsView === "preview") runWorkspacePreview();
+            saveWorkspaceToServer(false);
+            if (btnEl) {
+                btnEl.innerText = "Uygulandı";
+                setTimeout(() => { btnEl.innerText = "Satırları Uygula (Patch)"; }, 1800);
+            }
+        }
+
+        function formatInlineMarkdown(text) {
+            let safe = escapeHtml(text);
+            safe = safe.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+            safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-white font-bold">$1</strong>');
+            return safe.replace(/\n/g, "<br>");
+        }
+
+        function formatAssistantContent(rawText) {
+            if (!rawText) return "";
+            const regex = /```([^\n]*)\n([\s\S]*?)```/g;
+            let lastIdx = 0;
+            let out = "";
+            let match;
+
+            while ((match = regex.exec(rawText)) !== null) {
+                const before = rawText.slice(lastIdx, match.index);
+                if (before.trim()) {
+                    out += `<div class="leading-relaxed">${formatInlineMarkdown(before)}</div>`;
+                }
+                const headerRaw = (match[1] || "").trim();
+                const codeBody = (match[2] || "").replace(/\n$/, "");
+                let lang = "code";
+                let filename = "";
+                if (headerRaw.includes(":")) {
+                    const parts = headerRaw.split(":");
+                    lang = (parts[0] || "code").trim().toLowerCase();
+                    filename = parts.slice(1).join(":").trim();
+                } else if (headerRaw) {
+                    lang = headerRaw.toLowerCase();
+                }
+
+                const blockIdx = CODE_BLOCKS_STORE.length;
+                CODE_BLOCKS_STORE.push({ lang, filename, code: codeBody });
+
+                const isPatch = (lang === "patch");
+                const isHtml = (lang === "html" || filename.toLowerCase().endsWith(".html"));
+                const badgeText = filename ? `${lang.toUpperCase()} · ${filename}` : lang.toUpperCase();
+
+                const codeLinesHtml = codeBody.split("\n").map((ln, idx) =>
+                    `<div class="code-line"><span class="code-ln">${idx + 1}</span><span class="code-txt">${escapeHtml(ln)}</span></div>`
+                ).join("");
+
+                const actionBtns = isPatch
+                    ? `<button onclick="applyLinePatchBlock(${blockIdx}, this)" class="px-2.5 py-1 rounded-md btn-outline-emerald text-[10px] font-bold">Satırları Uygula (Patch)</button>
+                       <button onclick="copyCodeBlock(${blockIdx}, this)" class="px-2.5 py-1 rounded-md btn-outline-zinc text-[10px] font-bold">Kopyala</button>`
+                    : `<button onclick="copyCodeBlock(${blockIdx}, this)" class="px-2.5 py-1 rounded-md btn-outline-zinc text-[10px] font-bold">Kopyala</button>
+                       <button onclick="saveCodeBlockToWorkspace(${blockIdx}, false)" class="px-2.5 py-1 rounded-md btn-outline-cyan text-[10px] font-bold">Kaydet</button>
+                       <button onclick="downloadCodeBlock(${blockIdx})" class="px-2.5 py-1 rounded-md btn-outline-zinc text-[10px] font-bold">İndir</button>
+                       ${isHtml ? `<button onclick="saveCodeBlockToWorkspace(${blockIdx}, true)" class="px-2.5 py-1 rounded-md btn-outline-emerald text-[10px] font-bold">Önizle</button>` : ""}`;
+
+                out += `
+                <div class="code-card">
+                    <div class="code-card-header">
+                        <span class="text-[10px] font-mono font-bold ${isPatch ? 'text-emerald-300' : 'text-cyan-300'}">${escapeHtml(badgeText)}</span>
+                        <div class="flex flex-wrap items-center gap-1.5">${actionBtns}</div>
+                    </div>
+                    <div class="code-pre">${codeLinesHtml}</div>
+                </div>`;
+                lastIdx = regex.lastIndex;
+            }
+
+            const rest = rawText.slice(lastIdx);
+            if (rest) {
+                out += `<div class="leading-relaxed">${formatInlineMarkdown(rest)}</div>`;
+            }
+            return out;
+        }
+
         function renderAssistantSidebar() {
             document.getElementById("astChatList").innerHTML = STATE.assistant_chats.map(ch => `
                 <div class="flex items-center justify-between px-3 py-2 rounded-xl text-[11px] cursor-pointer font-semibold transition ${STATE.activeAstChat && STATE.activeAstChat.id === ch.id ? 'bg-zinc-900 border border-cyan-500/60 text-white' : 'hover:bg-white/5 text-zinc-400 border border-transparent'}">
@@ -1259,31 +1841,55 @@
                 </div>
             `).join("") || `<p class="text-[11px] text-zinc-500 px-1">Sohbet geçmişi boş.</p>`;
         }
-        function selectAstChat(chatId) { STATE.activeAstChat = STATE.assistant_chats.find(c => c.id === chatId) || null; renderAssistantSidebar(); renderAssistantMessages(); }
-        function resetAssistantChat() { STATE.activeAstChat = null; renderAssistantSidebar(); renderAssistantMessages(); }
+        function selectAstChat(chatId) {
+            STATE.activeAstChat = STATE.assistant_chats.find(c => c.id === chatId) || null;
+            syncWorkspaceFromActiveChat();
+            renderAssistantSidebar();
+            renderAssistantMessages();
+        }
+        function resetAssistantChat() {
+            STATE.activeAstChat = null;
+            STATE.astWorkspace = {};
+            STATE.astActiveFile = "";
+            renderWorkspaceUI();
+            renderAssistantSidebar();
+            renderAssistantMessages();
+        }
         async function deleteAstChat(chatId) {
             await fetch(`/api/assistant/chats/${chatId}`, {method: "DELETE"});
             STATE.assistant_chats = STATE.assistant_chats.filter(c => c.id !== chatId);
             if (STATE.activeAstChat && STATE.activeAstChat.id === chatId) STATE.activeAstChat = STATE.assistant_chats[0] || null;
+            syncWorkspaceFromActiveChat();
             renderAssistantSidebar(); renderAssistantMessages();
         }
         function renderAssistantMessages() {
             const box = document.getElementById("astMessagesBox");
+            CODE_BLOCKS_STORE = [];
             if (!STATE.activeAstChat) {
                 box.innerHTML = `
                 <div class="h-full flex flex-col items-center justify-center text-center px-4">
-                    <div class="card-surface max-w-xs w-full rounded-2xl p-6 space-y-2.5">
-                        <div class="w-11 h-11 mx-auto rounded-xl bg-zinc-950 border border-cyan-500/50 flex items-center justify-center text-xs font-extrabold text-cyan-300">AI</div>
-                        <h4 class="font-extrabold text-sm text-white">AI Asistan Hazır</h4>
-                        <p class="text-xs text-zinc-400">Aşağıdaki kutuya mesajınızı yazarak yeni bir sohbet başlatın.</p>
+                    <div class="card-surface max-w-sm w-full rounded-2xl p-6 space-y-2.5">
+                        <div class="w-11 h-11 mx-auto rounded-xl bg-zinc-950 border border-cyan-500/50 flex items-center justify-center text-xs font-extrabold text-cyan-300">CODE</div>
+                        <h4 class="font-extrabold text-sm text-white">AI Asistan & Kod Stüdyosu Hazır</h4>
+                        <p class="text-xs text-zinc-400 leading-relaxed">Kod yazdırabilir, Kod Alanı'nı açıp satır bazlı düzenleme yaptırabilir ve HTML/CSS/JS projelerini canlı önizleyebilirsiniz.</p>
                     </div>
                 </div>`;
                 return;
             }
-            box.innerHTML = STATE.activeAstChat.messages.map(m => `
-                <div class="flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}">
-                    <div class="max-w-[88%] lg:max-w-2xl rounded-2xl p-3.5 text-xs lg:text-[13px] leading-relaxed ${m.role === 'user' ? 'bg-zinc-900 border border-cyan-500/45 text-white' : 'card-surface text-zinc-200'} whitespace-pre-wrap">${escapeHtml(m.content)}</div>
-                </div>`).join("");
+            box.innerHTML = STATE.activeAstChat.messages.map((m, idx) => {
+                const isUser = m.role === "user";
+                const bodyHtml = isUser ? `<div class="whitespace-pre-wrap leading-relaxed">${escapeHtml(m.content)}</div>` : formatAssistantContent(m.content);
+                return `
+                <div class="flex ${isUser ? 'justify-end' : 'justify-start'}">
+                    <div class="${isUser ? 'max-w-[85%] lg:max-w-2xl bg-zinc-900 border border-cyan-500/45 text-white' : 'w-full max-w-[96%] lg:max-w-3xl card-surface text-zinc-200'} rounded-2xl p-3.5 text-xs lg:text-[13px] select-text">
+                        <div class="flex items-center justify-between gap-3 mb-1.5 text-[10px] text-zinc-500">
+                            <span class="font-bold uppercase tracking-wider ${isUser ? 'text-cyan-300' : 'text-zinc-400'}">${isUser ? 'Sen' : 'Asistan'}</span>
+                            <button onclick="copyTextToClipboard(STATE.activeAstChat.messages[${idx}].content, this)" class="text-[10px] text-zinc-400 hover:text-white font-semibold">Mesajı Kopyala</button>
+                        </div>
+                        ${bodyHtml}
+                    </div>
+                </div>`;
+            }).join("");
             box.scrollTop = box.scrollHeight;
         }
         async function sendAssistantMessage() {
@@ -1291,15 +1897,21 @@
             const content = input.value.trim();
             if (!content) return;
             input.value = "";
+            input.style.height = "";
             const btn = document.getElementById("astSendBtn");
             if (btn) { btn.disabled = true; btn.innerText = "..."; }
 
             if (!STATE.activeAstChat) {
-                STATE.activeAstChat = { id: null, title: content.slice(0, 32), messages: [] };
+                STATE.activeAstChat = { id: null, title: content.slice(0, 32), messages: [], workspace_files: { ...STATE.astWorkspace } };
             }
             STATE.activeAstChat.messages.push({ role: "user", content });
             STATE.activeAstChat.messages.push({ role: "assistant", content: "" });
             renderAssistantMessages();
+
+            const codeMode = document.getElementById("astCodeMode")?.checked ?? true;
+            const tempVal = parseFloat(document.getElementById("astTemp")?.value || "0.3");
+            const maxTokVal = parseInt(document.getElementById("astMaxTokens")?.value || "4096", 10);
+            const sysPromptVal = (document.getElementById("astSystemPrompt")?.value || "").trim();
 
             let streamText = "";
             try {
@@ -1308,7 +1920,13 @@
                     body: JSON.stringify({
                         chat_id: STATE.activeAstChat.id,
                         content,
-                        model_id: document.getElementById("astModelSelect").value
+                        model_id: document.getElementById("astModelSelect").value,
+                        code_mode: codeMode,
+                        temperature: tempVal,
+                        max_tokens: maxTokVal,
+                        system_prompt: sysPromptVal,
+                        workspace_files: STATE.astWorkspace,
+                        active_file: STATE.astActiveFile
                     })
                 });
                 if (!res.ok) {
@@ -1339,6 +1957,7 @@
                             if (idx > -1) STATE.assistant_chats[idx] = evt.chat;
                             else STATE.assistant_chats.unshift(evt.chat);
                             STATE.activeAstChat = evt.chat;
+                            syncWorkspaceFromActiveChat();
                             STATE.user.credits = evt.credits;
                             renderHeader(); renderAssistantSidebar(); renderAssistantMessages();
                         }

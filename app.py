@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import uuid
@@ -611,6 +612,14 @@ def resolve_source_media_to_b64(source_media):
     return None, None
 
 
+def strip_thinking_tags(text):
+    if not text:
+        return ""
+    cleaned = re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.IGNORECASE)
+    cleaned = re.sub(r"<thinking>[\s\S]*?</thinking>", "", cleaned, flags=re.IGNORECASE)
+    return cleaned.lstrip("\n")
+
+
 def call_llm_api(messages, model_api_id, endpoint_override="", temperature=None, max_tokens=None):
     api_key = (DB["settings"].get("venice_api_key") or os.getenv("VENICE_API_KEY", "")).strip()
     url = endpoint_override.strip() if endpoint_override else DB["settings"].get("chat_endpoint", "https://api.venice.ai/api/v1/chat/completions")
@@ -631,13 +640,18 @@ def call_llm_api(messages, model_api_id, endpoint_override="", temperature=None,
         "model": model_api_id,
         "messages": messages,
         "temperature": temp,
-        "max_tokens": mtok
+        "max_tokens": mtok,
+        "venice_parameters": {
+            "disable_thinking": True,
+            "strip_thinking_response": True,
+            "include_venice_system_prompt": False
+        }
     }
     resp = requests.post(url, headers=headers, json=payload, timeout=90)
     if resp.status_code != 200:
         raise Exception(f"Venice Chat API Hatası ({resp.status_code}): {resp.text[:300]}")
     data = resp.json()
-    return data["choices"][0]["message"]["content"]
+    return strip_thinking_tags(data["choices"][0]["message"]["content"])
 
 
 def call_llm_api_stream(messages, model_api_id, endpoint_override="", temperature=None, max_tokens=None):
@@ -662,11 +676,18 @@ def call_llm_api_stream(messages, model_api_id, endpoint_override="", temperatur
         "messages": messages,
         "temperature": temp,
         "max_tokens": mtok,
-        "stream": True
+        "stream": True,
+        "venice_parameters": {
+            "disable_thinking": True,
+            "strip_thinking_response": True,
+            "include_venice_system_prompt": False
+        }
     }
     with requests.post(url, headers=headers, json=payload, stream=True, timeout=120) as resp:
         if resp.status_code != 200:
             raise Exception(f"Venice Chat API Hatası ({resp.status_code}): {resp.text[:300]}")
+        in_think = False
+        pending = ""
         for raw_line in resp.iter_lines(decode_unicode=True):
             if not raw_line:
                 continue
@@ -679,10 +700,41 @@ def call_llm_api_stream(messages, model_api_id, endpoint_override="", temperatur
             try:
                 chunk = json.loads(data_str)
                 delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content")
-                if delta:
-                    yield delta
+                if not delta:
+                    continue
+                pending += delta
+                while pending:
+                    if in_think:
+                        end_idx = pending.lower().find("</think>")
+                        if end_idx != -1:
+                            pending = pending[end_idx + 8:]
+                            in_think = False
+                            continue
+                        # Keep last 12 chars in case </think> is split across chunks
+                        if len(pending) > 12:
+                            pending = pending[-12:]
+                        break
+                    else:
+                        start_idx = pending.lower().find("<think>")
+                        if start_idx != -1:
+                            if start_idx > 0:
+                                yield pending[:start_idx]
+                            pending = pending[start_idx + 7:]
+                            in_think = True
+                            continue
+                        # Check if pending ends with partial "<think"
+                        partial_idx = pending.rfind("<")
+                        if partial_idx != -1 and "<think>".startswith(pending[partial_idx:].lower()):
+                            if partial_idx > 0:
+                                yield pending[:partial_idx]
+                            pending = pending[partial_idx:]
+                            break
+                        yield pending
+                        pending = ""
             except Exception:
                 continue
+        if not in_think and pending:
+            yield pending
 
 
 def compress_chat_memory_if_needed(chat, force=False):
@@ -1796,6 +1848,60 @@ def api_edit_or_delete_rp_message(chat_id, msg_id):
     return jsonify({"error": "Mesaj bulunamadı."}), 404
 
 
+def build_assistant_system_prompt(code_mode=False, workspace_files=None, active_file="", custom_system=""):
+    base = (custom_system or "").strip() or "Sen yardımcı, zeki, doğrudan sonuca giden ve net yanıtlar veren bir AI asistansın. Düşünme sürecini (<think>) asla yazma, doğrudan cevabı ver."
+    if not code_mode:
+        return base
+
+    code_rules = (
+        "\n\n[KODLAMA VE SATIR BAZLI DÜZENLEME MODU AKTİF]\n"
+        "1. Yeni bir dosya oluştururken veya tam dosya yazarken mutlaka dosya adıyla kod bloğu kullan:\n"
+        "   ```dil:dosya/yolu.uzanti\n"
+        "   ...kod...\n"
+        "   ```\n"
+        "   Örnek: ```html:index.html veya ```js:src/app.js\n"
+        "2. Mevcut bir çalışma alanı dosyasını düzenlerken TÜM DOSYAYI BAŞTAN YAZMA! "
+        "Sana verilen satır numaralarını (1: ..., 2: ...) analiz et ve sadece değişen satırları şu PATCH formatında yaz:\n"
+        "   ```patch:dosya/yolu.uzanti\n"
+        "   REPLACE 12-16\n"
+        "   yeni kod satırı 1\n"
+        "   yeni kod satırı 2\n"
+        "   END\n"
+        "   ```\n"
+        "   Desteklenen komutlar: `REPLACE başlangıç-bitiş` (1-tabanlı, dahil), `INSERT_AFTER satır_no`, `DELETE başlangıç-bitiş`.\n"
+        "   Birden fazla değişiklik için aynı patch bloğunda birden fazla komut yazabilirsin.\n"
+        "3. Açıklamaları kısa ve net tut; kodu daima ``` kod blokları içinde belirt."
+    )
+
+    files_ctx = ""
+    if isinstance(workspace_files, dict) and workspace_files:
+        parts = ["\n\n[MEVCUT ÇALIŞMA ALANI DOSYALARI (SATIR NUMARALI)]"]
+        for fpath, fcontent in list(workspace_files.items())[:15]:
+            lines = str(fcontent or "").splitlines()
+            numbered = "\n".join(f"{i+1}: {ln}" for i, ln in enumerate(lines[:400]))
+            active_tag = " (AKTİF DOSYA)" if fpath == active_file else ""
+            parts.append(f"--- DOSYA: {fpath}{active_tag} ({len(lines)} satır) ---\n{numbered}")
+        files_ctx = "\n".join(parts)
+
+    return base + code_rules + files_ctx
+
+
+@app.route("/api/assistant/chats/<chat_id>/workspace", methods=["POST"])
+@login_required
+def api_save_assistant_workspace(chat_id):
+    user = get_current_user()
+    chat = DB["assistant_chats"].get(chat_id)
+    if not chat or (chat["user"] != user["username"] and user.get("role") != "admin"):
+        return jsonify({"error": "Sohbet bulunamadı."}), 404
+    data = request.json or {}
+    ws = data.get("workspace_files")
+    if isinstance(ws, dict):
+        chat["workspace_files"] = {str(k): str(v) for k, v in ws.items()}
+        chat["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        save_db()
+    return jsonify({"success": True, "workspace_files": chat.get("workspace_files", {})})
+
+
 @app.route("/api/assistant/send/stream", methods=["POST"])
 @login_required
 def api_assistant_send_stream():
@@ -1804,6 +1910,14 @@ def api_assistant_send_stream():
     chat_id = data.get("chat_id")
     content = (data.get("content") or "").strip()
     model_id = data.get("model_id")
+    code_mode = bool(data.get("code_mode", False))
+    workspace_files = data.get("workspace_files") if isinstance(data.get("workspace_files"), dict) else None
+    active_file = (data.get("active_file") or "").strip()
+    custom_system = (data.get("system_prompt") or "").strip()
+    temperature = data.get("temperature")
+    max_tokens = data.get("max_tokens")
+    if max_tokens is None and code_mode:
+        max_tokens = 4096
 
     if not content:
         return jsonify({"error": "Mesaj boş olamaz."}), 400
@@ -1827,20 +1941,35 @@ def api_assistant_send_stream():
             "user": user["username"],
             "title": content[:32],
             "messages": [],
+            "workspace_files": workspace_files or {},
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         DB["assistant_chats"][chat_id] = chat
+    elif workspace_files is not None:
+        chat["workspace_files"] = workspace_files
 
     chat["messages"].append({"role": "user", "content": content})
-    prompt_msgs = [{"role": "system", "content": "Sen yardımcı, zeki ve net yanıtlar veren bir AI asistansın."}] + chat["messages"][-20:]
+    sys_prompt = build_assistant_system_prompt(
+        code_mode=code_mode,
+        workspace_files=chat.get("workspace_files") or workspace_files,
+        active_file=active_file,
+        custom_system=custom_system
+    )
+    prompt_msgs = [{"role": "system", "content": sys_prompt}] + chat["messages"][-20:]
 
     def generate():
         full_reply = []
         try:
-            for delta in call_llm_api_stream(prompt_msgs, model_obj["api_model_id"], model_obj.get("endpoint_override", "")):
+            for delta in call_llm_api_stream(
+                prompt_msgs,
+                model_obj["api_model_id"],
+                model_obj.get("endpoint_override", ""),
+                temperature=temperature,
+                max_tokens=max_tokens
+            ):
                 full_reply.append(delta)
                 yield f"data: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
-            reply = "".join(full_reply)
+            reply = strip_thinking_tags("".join(full_reply))
             chat["messages"].append({"role": "assistant", "content": reply})
             chat["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             save_db()
@@ -1861,6 +1990,14 @@ def api_assistant_send():
     chat_id = data.get("chat_id")
     content = (data.get("content") or "").strip()
     model_id = data.get("model_id")
+    code_mode = bool(data.get("code_mode", False))
+    workspace_files = data.get("workspace_files") if isinstance(data.get("workspace_files"), dict) else None
+    active_file = (data.get("active_file") or "").strip()
+    custom_system = (data.get("system_prompt") or "").strip()
+    temperature = data.get("temperature")
+    max_tokens = data.get("max_tokens")
+    if max_tokens is None and code_mode:
+        max_tokens = 4096
 
     if not content:
         return jsonify({"error": "Mesaj boş olamaz."}), 400
@@ -1884,15 +2021,30 @@ def api_assistant_send():
             "user": user["username"],
             "title": content[:32],
             "messages": [],
+            "workspace_files": workspace_files or {},
             "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         DB["assistant_chats"][chat_id] = chat
+    elif workspace_files is not None:
+        chat["workspace_files"] = workspace_files
 
     chat["messages"].append({"role": "user", "content": content})
-    prompt_msgs = [{"role": "system", "content": "Sen yardımcı, zeki ve net yanıtlar veren bir AI asistansın."}] + chat["messages"][-20:]
+    sys_prompt = build_assistant_system_prompt(
+        code_mode=code_mode,
+        workspace_files=chat.get("workspace_files") or workspace_files,
+        active_file=active_file,
+        custom_system=custom_system
+    )
+    prompt_msgs = [{"role": "system", "content": sys_prompt}] + chat["messages"][-20:]
 
     try:
-        reply = call_llm_api(prompt_msgs, model_obj["api_model_id"], model_obj.get("endpoint_override", ""))
+        reply = call_llm_api(
+            prompt_msgs,
+            model_obj["api_model_id"],
+            model_obj.get("endpoint_override", ""),
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
     except Exception as e:
         chat["messages"].pop()
         refund_credit(user, model_obj)
