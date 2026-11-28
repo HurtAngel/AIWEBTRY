@@ -94,98 +94,7 @@ def get_default_db():
                 "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
             }
         },
-        "models": [
-            {
-                "id": "mdl_venice_uncensored",
-                "name": "Venice Uncensored (RP Master)",
-                "api_model_id": "venice-uncensored",
-                "type": "chat",
-                "cost": 2,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_llama_70b",
-                "name": "Llama 3.3 70B Instruct",
-                "api_model_id": "llama-3.3-70b",
-                "type": "chat",
-                "cost": 3,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_firered_edit",
-                "name": "FireRed Image Edit (Ucuz img2img)",
-                "api_model_id": "firered-image-edit",
-                "type": "image",
-                "cost": 12,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_qwen_edit",
-                "name": "Qwen Image 2.1 Turbo Edit (img2img)",
-                "api_model_id": "qwen-image-2-1-turbo-edit",
-                "type": "image",
-                "cost": 15,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_qwen_edit_uncensored",
-                "name": "Qwen Edit Uncensored (img2img)",
-                "api_model_id": "qwen-edit-uncensored",
-                "type": "image",
-                "cost": 15,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_lustify_uncensored",
-                "name": "Lustify SDXL (Tam Sansürsüz txt2img)",
-                "api_model_id": "lustify-sdxl",
-                "type": "image",
-                "cost": 10,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_lustify_v8",
-                "name": "Lustify v8 (Sansürsüz Yeni txt2img)",
-                "api_model_id": "lustify-v8",
-                "type": "image",
-                "cost": 10,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_flux_img",
-                "name": "Venice Fluently XL Image",
-                "api_model_id": "fluently-xl",
-                "type": "image",
-                "cost": 10,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_seedream",
-                "name": "Seedream V4.5",
-                "api_model_id": "seedream-v4.5",
-                "type": "image",
-                "cost": 12,
-                "endpoint_override": "",
-                "active": True
-            },
-            {
-                "id": "mdl_wan_video",
-                "name": "Venice Wan-2.5 Motion Video",
-                "api_model_id": "wan-2.5-preview-text-to-video",
-                "type": "video",
-                "cost": 25,
-                "endpoint_override": "",
-                "active": True
-            }
-        ],
+        "models": [],
         "characters": [],
         "trained_models": [
             {
@@ -1902,6 +1811,93 @@ def api_save_assistant_workspace(chat_id):
         chat["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         save_db()
     return jsonify({"success": True, "workspace_files": chat.get("workspace_files", {})})
+
+
+@app.route("/api/assistant/run", methods=["POST"])
+@login_required
+def api_assistant_run_code():
+    import subprocess
+    import tempfile
+    import shutil
+    try:
+        import resource
+    except ImportError:
+        resource = None
+
+    data = request.json or {}
+    workspace_files = data.get("workspace_files") if isinstance(data.get("workspace_files"), dict) else {}
+    entry_file = (data.get("entry_file") or "").strip()
+    if not entry_file or entry_file not in workspace_files:
+        return jsonify({"error": "Çalıştırılacak geçerli bir dosya seçin."}), 400
+
+    ext = os.path.splitext(entry_file)[1].lower()
+    if ext == ".py":
+        cmd = [sys.executable, entry_file]
+    elif ext in (".js", ".mjs"):
+        cmd = ["node", entry_file]
+    elif ext == ".sh":
+        cmd = ["bash", entry_file]
+    else:
+        return jsonify({"error": f"Sanal makine yalnızca .py, .js, .mjs veya .sh dosyalarını çalıştırabilir (HTML için Canlı Önizleme kullanın)."}), 400
+
+    tmpdir = tempfile.mkdtemp(prefix="nexus_vm_")
+    start_ts = time.time()
+    try:
+        for rel_path, content in workspace_files.items():
+            safe_rel = os.path.normpath(str(rel_path)).lstrip(os.sep)
+            if safe_rel.startswith(".."):
+                continue
+            full_path = os.path.join(tmpdir, safe_rel)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            with open(full_path, "w", encoding="utf-8") as wf:
+                wf.write(str(content or ""))
+
+        def set_vm_limits():
+            if resource is not None:
+                # 64 MB RAM limit
+                mem_bytes = 64 * 1024 * 1024
+                try:
+                    resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
+                except Exception:
+                    pass
+                # 2s CPU time limit (~0.01 CPU throttle)
+                try:
+                    resource.setrlimit(resource.RLIMIT_CPU, (2, 2))
+                except Exception:
+                    pass
+            try:
+                os.nice(19)
+            except Exception:
+                pass
+
+        proc = subprocess.run(
+            cmd,
+            cwd=tmpdir,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            preexec_fn=set_vm_limits
+        )
+        duration_ms = int((time.time() - start_ts) * 1000)
+        return jsonify({
+            "success": True,
+            "exit_code": proc.returncode,
+            "stdout": (proc.stdout or "")[:12000],
+            "stderr": (proc.stderr or "")[:12000],
+            "duration_ms": duration_ms
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            "success": False,
+            "exit_code": -1,
+            "stdout": "",
+            "stderr": "Sanal Makine Zaman Aşımı (5 saniye / 64 MB RAM / 0.01 CPU limiti aşıldı).",
+            "duration_ms": 5000
+        })
+    except Exception as e:
+        return jsonify({"error": f"Sanal makine hatası: {str(e)}"}), 500
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 @app.route("/api/assistant/send/stream", methods=["POST"])
