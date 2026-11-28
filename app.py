@@ -246,10 +246,7 @@ def ensure_db_compatibility(loaded):
         if not c.get("reference_image"):
             c["reference_image"] = c.get("avatar", "")
 
-    existing_ids = {m.get("api_model_id") for m in loaded.get("models", []) if isinstance(m, dict)}
-    for def_m in default["models"]:
-        if def_m["api_model_id"] not in existing_ids:
-            loaded["models"].append(def_m)
+    loaded["models"] = [m for m in loaded.get("models", []) if isinstance(m, dict)]
 
     fixed_media = {}
     for mid, m in loaded.get("media", {}).items():
